@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -143,15 +145,15 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             if (com.clipvault.app.data.local.AppDatabase.migrationFailed) {
                 Card(
                     colors = androidx.compose.material3.CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
@@ -184,17 +186,34 @@ fun SettingsScreen(
             val themeMode by viewModel.themeMode.collectAsState()
             var showThemeDialog by remember { mutableStateOf(false) }
 
-            // Theme Settings
-            SettingsItem(
-                icon = Icons.Default.Palette,
-                title = "Theme Mode",
-                subtitle = when (themeMode) {
-                    ThemeMode.LIGHT -> "Light"
-                    ThemeMode.DARK -> "Dark"
-                    ThemeMode.FOLLOW_SYSTEM -> "Follow System"
-                },
-                onClick = { showThemeDialog = true }
-            )
+            // Group 1: Appearance Settings Card
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                ),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Appearance",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    SettingsItem(
+                        icon = Icons.Default.Palette,
+                        title = "Theme Mode",
+                        subtitle = when (themeMode) {
+                            ThemeMode.LIGHT -> "Light"
+                            ThemeMode.DARK -> "Dark"
+                            ThemeMode.FOLLOW_SYSTEM -> "Follow System"
+                        },
+                        onClick = { showThemeDialog = true }
+                    )
+                }
+            }
 
             if (showThemeDialog) {
                 ThemeSelectionDialog(
@@ -207,66 +226,112 @@ fun SettingsScreen(
                 )
             }
 
-            // AI Settings
-            SettingsItem(
-                icon = Icons.Default.SmartToy,
-                title = "AI Settings",
-                subtitle = "Configure AI providers",
-                onClick = onAiSettings
-            )
-
-            // Export
-            SettingsItem(
-                icon = Icons.Default.CloudUpload,
-                title = "Export Data",
-                subtitle = when (exportState) {
-                    is ExportState.Loading -> "Exporting..."
-                    is ExportState.Success -> "Export complete"
-                    is ExportState.Error -> "Export failed"
-                    else -> "Export clips and tags as JSON"
-                },
-                onClick = { exportLauncher.launch("clipvault_export.json") },
-                enabled = exportState !is ExportState.Loading
-            )
-
-            // Import
-            SettingsItem(
-                icon = Icons.Default.CloudDownload,
-                title = "Import Data",
-                subtitle = when (importState) {
-                    is ImportState.Loading -> "Importing..."
-                    is ImportState.Success -> "Import complete"
-                    is ImportState.Error -> "Import failed"
-                    else -> "Import from JSON file"
-                },
-                onClick = { importLauncher.launch(arrayOf("application/json")) },
-                enabled = importState !is ImportState.Loading
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // About
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
+            // Group 2: Smart Features Settings Card (AI)
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                ),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
             ) {
-                Text(
-                    text = "ClipVault",
-                    style = MaterialTheme.typography.titleLarge
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Version 1.0.0",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "A powerful clipboard and note-taking app for collecting and organizing content from any source.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Smart Actions",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    SettingsItem(
+                        icon = Icons.Default.SmartToy,
+                        title = "AI Settings",
+                        subtitle = "Configure AI providers",
+                        onClick = onAiSettings
+                    )
+                }
+            }
+
+            // Group 3: Data Backup Settings Card
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                ),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Backup & Restore",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    SettingsItem(
+                        icon = Icons.Default.CloudUpload,
+                        title = "Export Data",
+                        subtitle = when (exportState) {
+                            is ExportState.Loading -> "Exporting..."
+                            is ExportState.Success -> "Export complete"
+                            is ExportState.Error -> "Export failed"
+                            else -> "Export clips and tags as JSON"
+                        },
+                        onClick = { exportLauncher.launch("clipvault_export.json") },
+                        enabled = exportState !is ExportState.Loading
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    SettingsItem(
+                        icon = Icons.Default.CloudDownload,
+                        title = "Import Data",
+                        subtitle = when (importState) {
+                            is ImportState.Loading -> "Importing..."
+                            is ImportState.Success -> "Import complete"
+                            is ImportState.Error -> "Import failed"
+                            else -> "Import from JSON file"
+                        },
+                        onClick = { importLauncher.launch(arrayOf("application/json")) },
+                        enabled = importState !is ImportState.Loading
+                    )
+                }
+            }
+
+            // Group 4: About Card
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                ),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Text(
+                        text = "About",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = "ClipVault",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Version 1.0.0",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "A powerful clipboard and note-taking app for collecting and organizing content from any source.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

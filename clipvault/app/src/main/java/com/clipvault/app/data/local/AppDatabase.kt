@@ -37,6 +37,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun contentAttachmentDao(): ContentAttachmentDao
 
     companion object {
+        @Volatile
         var migrationFailed = false
 
         private val dbLock = Any()
@@ -75,6 +76,9 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 try {
                     android.util.Log.d("AppDB", "Starting MIGRATION_1_2...")
+
+                    // Disable foreign keys during migration
+                    db.execSQL("PRAGMA foreign_keys = OFF;")
 
                     // 1. Create content_attachments table if not exists
                     db.execSQL("""
@@ -184,7 +188,37 @@ abstract class AppDatabase : RoomDatabase() {
                         }
                     }
 
-                    // 5. Verify migration and drop old table
+                    // 5. Rebuild item_tags to correctly reference the new items table
+                    val hasItemTagsOldTable = tableExists(db, "item_tags_old")
+                    val hasItemTagsTable = tableExists(db, "item_tags")
+
+                    if (hasItemTagsTable && !hasItemTagsOldTable) {
+                        db.execSQL("ALTER TABLE `item_tags` RENAME TO `item_tags_old`")
+                        android.util.Log.d("AppDB", "Renamed item_tags to item_tags_old")
+                    }
+
+                    // Create new item_tags table with foreign keys pointing to items
+                    db.execSQL("""
+                        CREATE TABLE IF NOT EXISTS `item_tags` (
+                            `itemId` INTEGER NOT NULL,
+                            `tagId` INTEGER NOT NULL,
+                            PRIMARY KEY(`itemId`, `tagId`),
+                            FOREIGN KEY(`itemId`) REFERENCES `items`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE ,
+                            FOREIGN KEY(`tagId`) REFERENCES `tags`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                        )
+                    """.trimIndent())
+                    // Copy item_tags data
+                    if (tableExists(db, "item_tags_old")) {
+                        db.execSQL("INSERT OR REPLACE INTO `item_tags` (`itemId`, `tagId`) SELECT `itemId`, `tagId` FROM `item_tags_old`")
+                        db.execSQL("DROP TABLE `item_tags_old`")
+                        android.util.Log.d("AppDB", "Migrated item_tags and dropped item_tags_old")
+                    }
+
+                    // Create indices on the new item_tags table (after dropping item_tags_old to avoid name clashes!)
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_item_tags_itemId` ON `item_tags` (`itemId`)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_item_tags_tagId` ON `item_tags` (`tagId`)")
+
+                    // 6. Verify migration and drop old items table
                     val verifyCursor = db.query("SELECT COUNT(*) FROM `items`")
                     val itemsCount = if (verifyCursor.moveToFirst()) verifyCursor.getInt(0) else 0
                     verifyCursor.close()
@@ -194,10 +228,18 @@ abstract class AppDatabase : RoomDatabase() {
                         db.execSQL("DROP TABLE `items_old`")
                         android.util.Log.d("AppDB", "Dropped table items_old")
                     }
+
+                    // Re-enable foreign keys after migration
+                    db.execSQL("PRAGMA foreign_keys = ON;")
                     android.util.Log.d("AppDB", "MIGRATION_1_2 completed successfully.")
                 } catch (e: Exception) {
                     android.util.Log.e("AppDB", "MIGRATION_1_2 FAILED!", e)
                     migrationFailed = true
+                    try {
+                        db.execSQL("PRAGMA foreign_keys = ON;")
+                    } catch (ex: Exception) {
+                        // ignore
+                    }
                     throw e
                 }
             }

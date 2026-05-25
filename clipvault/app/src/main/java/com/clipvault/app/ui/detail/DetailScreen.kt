@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -50,6 +51,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -105,6 +107,7 @@ fun DetailScreen(
  
     var showAiResultSheet by remember { mutableStateOf(false) }
     var showTagEditSheet by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
  
     // Lifecycle management for media player
     DisposableEffect(lifecycleOwner) {
@@ -333,6 +336,30 @@ fun DetailScreen(
         }
     }
 
+    if (showDeleteDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("确认删除") },
+            text = { Text("确定要删除这条收藏吗？此操作无法撤销。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        viewModel.deleteItem()
+                        onBack()
+                    }
+                ) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -359,8 +386,7 @@ fun DetailScreen(
                             Icon(Icons.Default.Edit, contentDescription = "Edit")
                         }
                         IconButton(onClick = {
-                            viewModel.deleteItem()
-                            onBack()
+                            showDeleteDialog = true
                         }) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete")
                         }
@@ -388,65 +414,127 @@ fun DetailScreen(
                             }
                         )
                 ) {
-                    // Content text if not empty
+                    // Card 1: Content text if not empty (padded, elevated card with Bento shape)
                     if (isEditing || clipItem.content.isNotBlank()) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth()
+                        ElevatedCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            shape = BentoAsymmetricCardShape,
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
                         ) {
-                            if (isEditing) {
-                                OutlinedTextField(
-                                    value = editContent,
-                                    onValueChange = { viewModel.updateEditContent(it) },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(200.dp),
-                                    label = { Text("Content") },
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                            } else {
-                                Text(
-                                    text = clipItem.content,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                if (isEditing) {
+                                    OutlinedTextField(
+                                        value = editContent,
+                                        onValueChange = { viewModel.updateEditContent(it) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(200.dp),
+                                        label = { Text("Content") },
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                } else {
+                                    Text(
+                                        text = clipItem.content,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    // Display media player if a media attachment is playing
+                    // Card 2: Display media player if a media attachment is playing (wrapped in elevated card)
                     if (playingUri != null) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth()
+                        ElevatedCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            shape = BentoAsymmetricCardShape,
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            ),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
                         ) {
-                            MediaContent(exoPlayer = viewModel.exoPlayer)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp)
+                            ) {
+                                MediaContent(exoPlayer = viewModel.exoPlayer)
+                            }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    // Display all attachments
-                    if (clipItem.attachments.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth()
+                    // Card 3a: Image Attachments (each gets its own massive, full-bleed elevated card to maximize screen width and scale adaptively)
+                    val (imageAttachments, otherAttachments) = remember(clipItem.attachments) {
+                        clipItem.attachments.partition { it.type == "image" }
+                    }
+
+                    imageAttachments.forEach { attachment ->
+                        var aspectRatio by remember(attachment.filePath) { mutableStateOf<Float?>(null) }
+                        ElevatedCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            shape = MaterialTheme.shapes.large,
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                            ),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
                         ) {
-                            Text(
-                                text = "Attachments",
-                                style = MaterialTheme.typography.titleMedium,
-                                modifier = Modifier.padding(bottom = 8.dp)
+                            val imageModifier = if (aspectRatio != null) {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(aspectRatio!!)
+                                    .clip(MaterialTheme.shapes.large)
+                            } else {
+                                Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 180.dp)
+                                    .clip(MaterialTheme.shapes.large)
+                            }
+
+                            AsyncImage(
+                                model = attachment.filePath,
+                                contentDescription = "Image attachment",
+                                modifier = imageModifier,
+                                onSuccess = { state ->
+                                    val size = state.painter.intrinsicSize
+                                    if (size.width > 0 && size.height > 0) {
+                                        aspectRatio = size.width / size.height
+                                    }
+                                },
+                                contentScale = ContentScale.FillWidth
                             )
-                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                clipItem.attachments.forEach { attachment ->
-                                    if (attachment.type == "image") {
-                                        AsyncImage(
-                                            model = attachment.filePath,
-                                            contentDescription = null,
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .height(200.dp)
-                                                .clip(RoundedCornerShape(12.dp)),
-                                            contentScale = ContentScale.Fit
-                                        )
-                                    } else {
+                        }
+                    }
+
+                    // Card 3b: Other Attachments (media, link, file)
+                    if (otherAttachments.isNotEmpty()) {
+                        ElevatedCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            shape = MaterialTheme.shapes.large,
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                            ),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = "Attachments & Links",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(bottom = 12.dp)
+                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    otherAttachments.forEach { attachment ->
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
@@ -517,82 +605,105 @@ fun DetailScreen(
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    // AI Analysis Action Button
-                    Box(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Button(
-                            onClick = { viewModel.analyzeContent() },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = PillShape
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("AI 智能分析")
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Tags section
-                    Column(
-                        modifier = Modifier.fillMaxWidth()
+                    // Card 4: AI Analysis Action Card (styled as a primary-tonal container floating card)
+                    ElevatedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        shape = PillShape,
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.analyzeContent() }
+                                .padding(vertical = 14.dp, horizontal = 24.dp),
+                            horizontalArrangement = Arrangement.Center,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Tags",
-                                style = MaterialTheme.typography.titleMedium
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
                             )
-                            IconButton(onClick = { showTagEditSheet = true }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Edit Tags")
-                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "AI 智能分析",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
+                    }
 
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            tags.forEach { tag ->
-                                val path = tagPaths[tag.id] ?: tag.name
-                                androidx.compose.material3.AssistChip(
-                                    onClick = {},
-                                    label = {
-                                        Text(
-                                            text = path,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    },
-                                    border = null,
-                                    colors = androidx.compose.material3.AssistChipDefaults.assistChipColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                                    ),
-                                    modifier = Modifier.widthIn(max = 200.dp)
+                    // Card 5: Tags & Metadata Section (grouped, elevated container card)
+                    ElevatedCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                        ),
+                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Tags",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                IconButton(onClick = { showTagEditSheet = true }) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit Tags")
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                tags.forEach { tag ->
+                                    val path = tagPaths[tag.id] ?: tag.name
+                                    androidx.compose.material3.AssistChip(
+                                        onClick = {},
+                                        label = {
+                                            Text(
+                                                text = path,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        },
+                                        border = null,
+                                        colors = androidx.compose.material3.AssistChipDefaults.assistChipColors(
+                                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                            labelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                        ),
+                                        modifier = Modifier.widthIn(max = 200.dp)
+                                    )
+                                }
+                            }
+
+                            if (clipItem.sourceApp.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "Source: ${clipItem.sourceApp}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    // Metadata
-                    if (clipItem.sourceApp.isNotBlank()) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "Source: ${clipItem.sourceApp}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
                 }
             }
         } ?: Box(
