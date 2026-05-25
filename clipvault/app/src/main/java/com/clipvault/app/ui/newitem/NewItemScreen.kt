@@ -1,5 +1,5 @@
 package com.clipvault.app.ui.newitem
-
+ 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import coil3.compose.AsyncImage
@@ -8,6 +8,7 @@ import androidx.compose.ui.draw.clip
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -47,9 +50,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clipvault.app.data.local.entity.Tag
-
+ 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun NewItemScreen(
@@ -58,8 +62,7 @@ fun NewItemScreen(
     viewModel: NewItemViewModel = hiltViewModel()
 ) {
     val content by viewModel.content.collectAsState()
-    val type by viewModel.type.collectAsState()
-    val filePath by viewModel.filePath.collectAsState()
+    val attachments by viewModel.attachments.collectAsState()
     val selectedTags by viewModel.selectedTags.collectAsState()
     val allTags by viewModel.allTags.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
@@ -137,29 +140,53 @@ fun NewItemScreen(
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
             )
 
-            if (filePath.isNotBlank()) {
+            if (attachments.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Preview",
+                    text = "Attachments",
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
-                if (type == "image") {
-                    AsyncImage(
-                        model = filePath,
-                        contentDescription = "Selected image preview",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),
-                        contentScale = ContentScale.Fit
-                    )
-                } else {
-                    Text(
-                        text = "Attached file: $filePath",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    attachments.forEachIndexed { index, attachment ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        ) {
+                            if (attachment.type == "image") {
+                                AsyncImage(
+                                    model = attachment.filePath,
+                                    contentDescription = "Selected image preview",
+                                    modifier = Modifier
+                                        .size(80.dp)
+                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Row(
+                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = if (attachment.type == "media") Icons.Default.CameraAlt else Icons.Default.Save,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = attachment.filePath.substringAfterLast('/'),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            IconButton(onClick = { viewModel.removeAttachment(index) }) {
+                                Icon(Icons.Default.Close, contentDescription = "Remove")
+                            }
+                        }
+                    }
                 }
             }
 
@@ -242,7 +269,7 @@ fun NewItemScreen(
             Button(
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isSaving && (content.isNotBlank() || filePath.isNotBlank()),
+                enabled = !isSaving && (content.isNotBlank() || attachments.isNotEmpty()),
                 shape = com.clipvault.app.ui.theme.PillShape
             ) {
                 if (isSaving) {

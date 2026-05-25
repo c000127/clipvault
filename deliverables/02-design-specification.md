@@ -82,14 +82,23 @@ ClipItem (1) ──── (N) ItemTag (N) ──── (1) Tag
 | 列名 | 类型 | 约束 | 说明 |
 |------|------|------|------|
 | id | INTEGER | PK, AUTO_INCREMENT | 主键 |
-| type | TEXT | NOT NULL | "text"/"image"/"link"/"media" |
-| content | TEXT | NOT NULL | 文本内容/本地路径/URL |
-| note | TEXT | DEFAULT "" | 用户备注（AI 总结追加至此） |
-| thumbnailPath | TEXT | DEFAULT "" | 缩略图本地路径 |
+| type | TEXT | NOT NULL | 默认为 "mixed" |
+| content | TEXT | NOT NULL | 文本内容/描述（AI 总结也直接追加于此） |
+| thumbnailPath | TEXT | DEFAULT "" | 封面缩略图本地路径 |
 | fetchedContent | TEXT | DEFAULT "" | Jsoup 抓取的页面纯文本 |
 | createdAt | INTEGER | NOT NULL | 创建时间戳 |
 | updatedAt | INTEGER | NOT NULL | 更新时间戳 |
 | sourceApp | TEXT | DEFAULT "" | 来源应用包名 |
+
+#### content_attachments 表
+| 列名 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| id | INTEGER | PK, AUTO_INCREMENT | 主键 |
+| itemId | INTEGER | FK → items.id, ON DELETE CASCADE | 关联收藏 ID |
+| type | TEXT | NOT NULL | 附件类型："image"/"link"/"media"/"file" |
+| filePath | TEXT | NOT NULL | 本地文件路径 / URL |
+| thumbnailPath | TEXT | DEFAULT "" | 缩略图路径（图片类型用） |
+| orderIndex | INTEGER | NOT NULL | 显示排序 |
 
 #### tags 表
 | 列名 | 类型 | 约束 | 说明 |

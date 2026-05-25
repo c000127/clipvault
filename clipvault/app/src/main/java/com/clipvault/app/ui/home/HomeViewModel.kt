@@ -26,29 +26,34 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import kotlinx.coroutines.flow.map
+import androidx.paging.map
+ 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val clipItemRepository: ClipItemRepository,
     private val tagRepository: TagRepository
 ) : ViewModel() {
-
+ 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
-
+ 
     private val _selectedTagIds = MutableStateFlow<Set<Long>>(emptySet())
     val selectedTagIds: StateFlow<Set<Long>> = _selectedTagIds.asStateFlow()
-
+ 
     private val _allTags = MutableStateFlow<List<Tag>>(emptyList())
     val allTags: StateFlow<List<Tag>> = _allTags.asStateFlow()
 
-    val items: Flow<PagingData<ClipItem>> = combine(_searchQuery, _selectedTagIds) { query, tagIds ->
+    private val _refreshTrigger = MutableStateFlow(0)
+ 
+    val items: Flow<PagingData<ClipItem>> = combine(_searchQuery, _selectedTagIds, _refreshTrigger) { query, tagIds, _ ->
         Pair(query, tagIds)
     }
         .debounce(300)
         .distinctUntilChanged()
         .flatMapLatest { (query, tagIds) ->
-            if (query.isBlank() && tagIds.isEmpty()) {
+            val flow = if (query.isBlank() && tagIds.isEmpty()) {
                 Pager(
                     config = PagingConfig(pageSize = 20, enablePlaceholders = false),
                     pagingSourceFactory = { clipItemRepository.getAllPaged() }
@@ -69,8 +74,19 @@ class HomeViewModel @Inject constructor(
                     pagingSourceFactory = { clipItemRepository.getItemsByTagsAndSearchWithChildren(tagIds.toList(), query) }
                 ).flow
             }
+            flow.map { pagingData ->
+                pagingData.map { item ->
+                    item.apply {
+                        attachments = clipItemRepository.getAttachmentsForItemOnce(item.id)
+                    }
+                }
+            }
         }
         .cachedIn(viewModelScope)
+
+    fun refresh() {
+        _refreshTrigger.value = _refreshTrigger.value + 1
+    }
 
     init {
         loadTags()

@@ -93,4 +93,16 @@ class TagRepository @Inject constructor(
     }
 
     suspend fun getItemCountForTag(tagId: Long): Int = itemTagDao.getItemCountForTag(tagId)
+
+    suspend fun getTagPath(tagId: Long): String {
+        val path = mutableListOf<String>()
+        var currentId: Long? = tagId
+        var safety = 50
+        while (currentId != null && safety-- > 0) {
+            val tag = tagDao.getByIdOnce(currentId) ?: break
+            path.add(tag.name)
+            currentId = tag.parentId
+        }
+        return path.reversed().joinToString("/")
+    }
 }

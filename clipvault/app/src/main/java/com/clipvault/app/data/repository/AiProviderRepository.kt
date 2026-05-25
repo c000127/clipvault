@@ -13,6 +13,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.datastore.preferences.core.emptyPreferences
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -76,7 +80,17 @@ class AiProviderRepository @Inject constructor(
     suspend fun getApiKey(providerId: Long): String {
         return try {
             val key = stringPreferencesKey("api_key_$providerId")
-            val prefs = context.apiKeyDataStore.data.first()
+            val prefs = withTimeoutOrNull(3000) {
+                context.apiKeyDataStore.data
+                    .catch { exception ->
+                        if (exception is IOException) {
+                            emit(emptyPreferences())
+                        } else {
+                            throw exception
+                        }
+                    }
+                    .first()
+            } ?: return ""
             val encrypted = prefs[key] ?: return ""
             cryptoManager.decrypt(encrypted)
         } catch (e: Exception) {

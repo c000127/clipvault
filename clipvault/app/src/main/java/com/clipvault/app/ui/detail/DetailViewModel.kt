@@ -56,26 +56,32 @@ class DetailViewModel @Inject constructor(
 
     private val _item = MutableStateFlow<ClipItem?>(null)
     val item: StateFlow<ClipItem?> = _item.asStateFlow()
-
+ 
     private val _tags = MutableStateFlow<List<Tag>>(emptyList())
     val tags: StateFlow<List<Tag>> = _tags.asStateFlow()
-
+ 
     private val _allTags = MutableStateFlow<List<Tag>>(emptyList())
     val allTags: StateFlow<List<Tag>> = _allTags.asStateFlow()
 
+    private val _tagPaths = MutableStateFlow<Map<Long, String>>(emptyMap())
+    val tagPaths: StateFlow<Map<Long, String>> = _tagPaths.asStateFlow()
+ 
     private val _fetchState = MutableStateFlow<FetchState>(FetchState.Idle)
     val fetchState: StateFlow<FetchState> = _fetchState.asStateFlow()
-
+ 
     private val _aiState = MutableStateFlow<AiState>(AiState.Idle)
     val aiState: StateFlow<AiState> = _aiState.asStateFlow()
 
+    private val _playingUri = MutableStateFlow<String?>(null)
+    val playingUri: StateFlow<String?> = _playingUri.asStateFlow()
+ 
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
-
+ 
     init {
         loadItem()
         loadAllTags()
     }
-
+ 
     /**
      * Load item and its tags using independent coroutines.
      * Previously used nested collect which blocked the outer Flow.
@@ -98,48 +104,53 @@ class DetailViewModel @Inject constructor(
                 }
         }
     }
-
+ 
     private fun loadAllTags() {
         viewModelScope.launch {
             tagRepository.getAllTags()
-                .catch { /* swallow */ }
-                .collectLatest {
-                    _allTags.value = it
+                .catch { _allTags.value = emptyList() }
+                .collectLatest { tagsList ->
+                    _allTags.value = tagsList
+                    _tagPaths.value = calculateTagPaths(tagsList)
                 }
         }
     }
 
-    fun updateNote(note: String) {
-        viewModelScope.launch {
-            _item.value?.let { current ->
-                clipItemRepository.update(current.copy(note = note, updatedAt = System.currentTimeMillis()))
+    private fun calculateTagPaths(allTagsList: List<Tag>): Map<Long, String> {
+        val tagMap = allTagsList.associateBy { it.id }
+        val paths = mutableMapOf<Long, String>()
+        for (tag in allTagsList) {
+            val path = mutableListOf<String>()
+            var current: Tag? = tag
+            var safety = 50
+            while (current != null && safety-- > 0) {
+                path.add(current.name)
+                current = tagMap[current.parentId]
             }
+            paths[tag.id] = path.reversed().joinToString("/")
         }
+        return paths
     }
-
+ 
     fun addTag(tagId: Long) {
         viewModelScope.launch {
             clipItemRepository.addTagToItem(itemId, tagId)
             // Flow will auto-update _tags via getTagsForItem
         }
     }
-
+ 
     fun removeTag(tagId: Long) {
         viewModelScope.launch {
             clipItemRepository.removeTagFromItem(itemId, tagId)
             // Flow will auto-update _tags via getTagsForItem
         }
     }
-
-    fun fetchLinkContent() {
-        val currentItem = _item.value ?: return
-        if (currentItem.type != "link") return
-
+ 
+    fun fetchLinkContent(url: String) {
         viewModelScope.launch {
             _fetchState.value = FetchState.Loading
             try {
                 val content = withContext(Dispatchers.IO) {
-                    val url = currentItem.content
                     val doc = Jsoup.connect(url)
                         .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
                         .timeout(15000)
@@ -147,11 +158,11 @@ class DetailViewModel @Inject constructor(
                         .followRedirects(true)
                         .ignoreHttpErrors(true)
                         .get()
-
+ 
                     // Try article/main/role=main first
                     val mainContent = doc.select("article, main, [role=main]").text()
                     val text = if (mainContent.length >= 50) mainContent else doc.body().text()
-
+ 
                     if (text.length < 50) {
                         "该页面可能需要 JavaScript 渲染，AI 分析将仅基于 URL"
                     } else {
@@ -171,33 +182,34 @@ class DetailViewModel @Inject constructor(
                 _fetchState.value = FetchState.Error("该链接不是网页")
             } catch (e: java.io.IOException) {
                 _fetchState.value = FetchState.Error("网络错误")
+            } catch (e: Exception) {
+                _fetchState.value = FetchState.Error("未知错误: ${e.message}")
             }
         }
     }
-
-    fun setupPlayer() {
-        val currentItem = _item.value ?: return
-        if (currentItem.type != "media") return
-
-        val mediaItem = MediaItem.fromUri(currentItem.content)
+ 
+    fun playMedia(filePath: String) {
+        _playingUri.value = filePath
+        val mediaItem = MediaItem.fromUri(filePath)
         exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
+        exoPlayer.play()
     }
-
+ 
     fun play() {
         exoPlayer.play()
     }
-
+ 
     fun pause() {
         exoPlayer.pause()
     }
-
+ 
     fun deleteItem() {
         viewModelScope.launch {
             _item.value?.let { clipItemRepository.delete(it) }
         }
     }
-
+ 
     fun analyzeContent() {
         val currentItem = _item.value ?: return
         viewModelScope.launch {
@@ -212,48 +224,54 @@ class DetailViewModel @Inject constructor(
                 _aiState.value = AiState.Error("AI 服务密钥 (API Key) 为空")
                 return@launch
             }
-
+ 
             // Decide content to send
-            val contentToSend = when (currentItem.type) {
-                "link" -> {
+            val firstLink = currentItem.attachments.firstOrNull { it.type == "link" }
+            val firstImage = currentItem.attachments.firstOrNull { it.type == "image" }
+            
+            val contentToSend = when {
+                firstLink != null -> {
                     if (currentItem.fetchedContent.isNotBlank()) {
-                        "URL: ${currentItem.content}\nFetched content:\n${currentItem.fetchedContent}"
+                        "URL: ${firstLink.filePath}\nFetched content:\n${currentItem.fetchedContent}"
                     } else {
-                        currentItem.content
+                        firstLink.filePath
                     }
                 }
                 else -> currentItem.content
             }
-
+ 
             val result = aiService.analyze(
                 provider = activeProvider,
                 apiKey = activeProvider.apiKey,
                 content = contentToSend,
-                contentType = currentItem.type,
-                imagePath = if (currentItem.type == "image") currentItem.content else null
+                contentType = if (firstLink != null) "link" else if (firstImage != null) "image" else "text",
+                imagePath = firstImage?.filePath
             )
-
+ 
             _aiState.value = when (result) {
                 is com.clipvault.app.data.remote.AiResult.Success -> AiState.Success(result.summary, result.suggestedTags)
                 is com.clipvault.app.data.remote.AiResult.Error -> AiState.Error(result.message)
             }
         }
     }
-
+ 
     fun clearAiState() {
         _aiState.value = AiState.Idle
     }
-
+ 
     fun applyAiResult(summary: String, selectedTags: List<String>) {
         val currentItem = _item.value ?: return
         viewModelScope.launch {
-            // Update note
-            val currentNote = currentItem.note
-            val updatedNote = if (currentNote.isBlank()) summary else "$currentNote\n\nAI Summary:\n$summary"
-
+            val currentContent = currentItem.content
+            val updatedContent = if (currentContent.isBlank()) {
+                "---\n🤖 AI 总结:\n$summary"
+            } else {
+                "$currentContent\n\n---\n🤖 AI 总结:\n$summary"
+            }
+ 
             database.withTransaction {
-                clipItemRepository.update(currentItem.copy(note = updatedNote, updatedAt = System.currentTimeMillis()))
-
+                clipItemRepository.update(currentItem.copy(content = updatedContent, updatedAt = System.currentTimeMillis()))
+ 
                 // Associate tags
                 val existingTags = tagRepository.getAllTagsOnce().toMutableList()
                 for (tagName in selectedTags) {
@@ -265,16 +283,16 @@ class DetailViewModel @Inject constructor(
             }
         }
     }
-
+ 
     private suspend fun getOrCreateTagHierarchy(tagPath: String, existingTags: MutableList<Tag>): Long? {
         val segments = tagPath.split('/')
         var currentParentId: Long? = null
         var lastTagId: Long? = null
-
+ 
         for (segment in segments) {
             val name = segment.trim()
             if (name.isBlank()) continue
-
+ 
             // Find match
             val match = existingTags.find { it.name.equals(name, ignoreCase = true) && it.parentId == currentParentId }
             if (match != null) {
@@ -291,7 +309,7 @@ class DetailViewModel @Inject constructor(
         }
         return lastTagId
     }
-
+ 
     override fun onCleared() {
         super.onCleared()
         exoPlayer.release()

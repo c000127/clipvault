@@ -3,10 +3,13 @@ package com.clipvault.app.data.repository
 import androidx.paging.PagingSource
 import com.clipvault.app.data.local.dao.ClipItemDao
 import com.clipvault.app.data.local.dao.ItemTagDao
+import com.clipvault.app.data.local.dao.ContentAttachmentDao
 import com.clipvault.app.data.local.entity.ClipItem
 import com.clipvault.app.data.local.entity.ItemTag
 import com.clipvault.app.data.local.entity.Tag
+import com.clipvault.app.data.local.entity.ContentAttachment
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,14 +20,18 @@ import androidx.room.withTransaction
 class ClipItemRepository @Inject constructor(
     private val database: AppDatabase,
     private val clipItemDao: ClipItemDao,
-    private val itemTagDao: ItemTagDao
+    private val itemTagDao: ItemTagDao,
+    private val contentAttachmentDao: ContentAttachmentDao
 ) {
     // CRUD 操作
-    suspend fun insertWithTags(item: ClipItem, tagIds: List<Long>): Long {
+    suspend fun insertWithTagsAndAttachments(item: ClipItem, tagIds: List<Long>, attachments: List<ContentAttachment>): Long {
         return database.withTransaction {
             val itemId = clipItemDao.insert(item)
             tagIds.forEach { tagId ->
                 itemTagDao.insert(ItemTag(itemId = itemId, tagId = tagId))
+            }
+            attachments.forEach { attachment ->
+                contentAttachmentDao.insert(attachment.copy(itemId = itemId))
             }
             itemId
         }
@@ -42,7 +49,11 @@ class ClipItemRepository @Inject constructor(
     suspend fun deleteByIds(ids: List<Long>) = clipItemDao.deleteByIds(ids)
 
     // 查询操作
-    fun getById(id: Long): Flow<ClipItem?> = clipItemDao.getById(id)
+    fun getById(id: Long): Flow<ClipItem?> = clipItemDao.getById(id).map { item ->
+        item?.apply {
+            attachments = contentAttachmentDao.getAttachmentsByItemIdOnce(id)
+        }
+    }
 
     fun getAllPaged(): PagingSource<Int, ClipItem> = clipItemDao.getAllPaged()
 
@@ -71,6 +82,10 @@ class ClipItemRepository @Inject constructor(
         clipItemDao.getItemsByTagsAndSearchWithChildren(tagIds, query)
 
     // Tag 关联操作
+    suspend fun insertAttachments(attachments: List<ContentAttachment>) = contentAttachmentDao.insertAll(attachments)
+    suspend fun getAttachmentsForItemOnce(itemId: Long): List<ContentAttachment> = contentAttachmentDao.getAttachmentsByItemIdOnce(itemId)
+    fun getAttachmentsForItem(itemId: Long): Flow<List<ContentAttachment>> = contentAttachmentDao.getAttachmentsByItemId(itemId)
+
     suspend fun addTagToItem(itemId: Long, tagId: Long) {
         itemTagDao.insert(ItemTag(itemId = itemId, tagId = tagId))
     }

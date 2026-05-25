@@ -41,13 +41,11 @@ interface ClipItemDao {
     @Query("SELECT * FROM items ORDER BY createdAt DESC LIMIT :limit")
     suspend fun getRecent(limit: Int): List<ClipItem>
 
-    // 全文搜索：content + note + 关联的 Tag.name
     @Query("""
         SELECT DISTINCT i.* FROM items i
         LEFT JOIN item_tags it ON i.id = it.itemId
         LEFT JOIN tags t ON it.tagId = t.id
         WHERE i.content LIKE '%' || :query || '%'
-           OR i.note LIKE '%' || :query || '%'
            OR t.name LIKE '%' || :query || '%'
         ORDER BY i.createdAt DESC
     """)
@@ -58,7 +56,6 @@ interface ClipItemDao {
         LEFT JOIN item_tags it ON i.id = it.itemId
         LEFT JOIN tags t ON it.tagId = t.id
         WHERE i.content LIKE '%' || :query || '%'
-           OR i.note LIKE '%' || :query || '%'
            OR t.name LIKE '%' || :query || '%'
         ORDER BY i.createdAt DESC
     """)
@@ -125,7 +122,7 @@ interface ClipItemDao {
         LEFT JOIN item_tags it ON i.id = it.itemId
         LEFT JOIN tags t ON it.tagId = t.id
         WHERE (it.tagId IN (SELECT id FROM tag_tree))
-          AND (i.content LIKE '%' || :query || '%' OR i.note LIKE '%' || :query || '%' OR t.name LIKE '%' || :query || '%')
+          AND (i.content LIKE '%' || :query || '%' OR t.name LIKE '%' || :query || '%')
         ORDER BY i.createdAt DESC
     """)
     fun getItemsByTagsAndSearchWithChildren(tagIds: List<Long>, query: String): PagingSource<Int, ClipItem>

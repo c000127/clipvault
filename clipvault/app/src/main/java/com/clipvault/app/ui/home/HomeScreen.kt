@@ -17,6 +17,7 @@ import com.clipvault.app.ui.theme.PillShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -101,8 +102,21 @@ fun HomeScreen(
     val allTags by viewModel.allTags.collectAsState()
     var showTagFilter by remember { mutableStateOf(false) }
     val pagingItems = viewModel.items.collectAsLazyPagingItems()
-
+ 
     val selectedItems = remember { mutableStateListOf<Long>() }
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     if (showTagFilter) {
         TagFilterSheet(
@@ -171,6 +185,17 @@ fun HomeScreen(
                 allTags.filter { selectedTagIds.contains(it.id) }
             }
             if (selectedTags.isNotEmpty()) {
+                val getTagPath: (Tag) -> String = { tag ->
+                    val tagMap = allTags.associateBy { it.id }
+                    val path = mutableListOf<String>()
+                    var current: Tag? = tag
+                    var safety = 50
+                    while (current != null && safety-- > 0) {
+                        path.add(current.name)
+                        current = tagMap[current.parentId]
+                    }
+                    path.reversed().joinToString("/")
+                }
                 FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -182,7 +207,7 @@ fun HomeScreen(
                         InputChip(
                             selected = true,
                             onClick = { viewModel.toggleTagSelection(tag.id) },
-                            label = { Text(tag.name) },
+                            label = { Text(getTagPath(tag)) },
                             trailingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.Close,
@@ -335,55 +360,52 @@ private fun ClipCard(
             shape = BentoAsymmetricCardShape
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                // Content preview based on type with Bento-like varying aspect ratios
-                when (item.type) {
-                    "image" -> {
-                        if (item.thumbnailPath.isNotBlank()) {
-                            AsyncImage(
-                                model = item.thumbnailPath,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(if (item.id % 2L == 0L) 1.2f else 0.8f) // non-symmetric bento grid aspect ratio
-                                    .clip(MaterialTheme.shapes.medium),
-                                contentScale = ContentScale.Crop
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
-                    "link" -> {
-                        Icon(
-                            imageVector = Icons.Default.Link,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.sharedElement(
-                                sharedContentState = rememberSharedContentState(key = "icon_${item.id}"),
-                                animatedVisibilityScope = animatedVisibilityScope
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
-                    "media" -> {
-                        val icon = if (item.content.endsWith(".mp4") || item.content.endsWith(".mkv")) {
-                            Icons.Default.VideoFile
-                        } else {
-                            Icons.Default.AudioFile
-                        }
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.sharedElement(
-                                sharedContentState = rememberSharedContentState(key = "icon_${item.id}"),
-                                animatedVisibilityScope = animatedVisibilityScope
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                    }
+                // Content preview: display cover thumbnail if it exists
+                if (item.thumbnailPath.isNotBlank()) {
+                    AsyncImage(
+                        model = item.thumbnailPath,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(if (item.id % 2L == 0L) 1.2f else 0.8f) // non-symmetric bento grid aspect ratio
+                            .clip(MaterialTheme.shapes.medium),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
-
+ 
+                // Display attachment type indicators
+                val hasLink = item.attachments.any { it.type == "link" }
+                val hasMedia = item.attachments.any { it.type == "media" }
+                val hasFile = item.attachments.any { it.type == "file" }
+                
+                if (hasLink || hasMedia || hasFile) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (hasLink) {
+                            Icon(
+                                imageVector = Icons.Default.Link,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        if (hasMedia) {
+                            Icon(
+                                imageVector = Icons.Default.VideoFile,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+ 
                 // Text content
-                if (item.type == "text" || item.note.isNotBlank()) {
+                if (item.content.isNotBlank()) {
                     Text(
                         text = item.content.take(100).let { if (it.length == 100) "$it..." else it },
                         style = MaterialTheme.typography.bodyMedium,
@@ -395,21 +417,9 @@ private fun ClipCard(
                         )
                     )
                 }
-
-                // Note preview
-                if (item.note.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = item.note.take(50).let { if (it.length == 50) "$it..." else it },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
+ 
                 Spacer(modifier = Modifier.height(8.dp))
-
+ 
                 // Timestamp
                 Text(
                     text = dateFormat.format(Date(item.createdAt)),

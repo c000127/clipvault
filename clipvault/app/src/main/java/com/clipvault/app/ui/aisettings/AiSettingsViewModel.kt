@@ -11,9 +11,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-
+ 
 data class ProviderFormState(
     val id: Long = 0,
     val name: String = "",
@@ -25,44 +26,46 @@ data class ProviderFormState(
     val temperature: Float = 0.7f,
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT
 )
-
+ 
 sealed interface TestState {
     data object Idle : TestState
     data object Loading : TestState
     data class Success(val message: String) : TestState
     data class Error(val message: String) : TestState
 }
-
+ 
 @HiltViewModel
 class AiSettingsViewModel @Inject constructor(
     private val aiProviderRepository: AiProviderRepository,
     private val aiService: AiService
 ) : ViewModel() {
-
+ 
     private val _providers = MutableStateFlow<List<AiProvider>>(emptyList())
     val providers: StateFlow<List<AiProvider>> = _providers.asStateFlow()
-
+ 
     private val _showForm = MutableStateFlow(false)
     val showForm: StateFlow<Boolean> = _showForm.asStateFlow()
-
+ 
     private val _formState = MutableStateFlow(ProviderFormState())
     val formState: StateFlow<ProviderFormState> = _formState.asStateFlow()
-
+ 
     private val _testState = MutableStateFlow<TestState>(TestState.Idle)
     val testState: StateFlow<TestState> = _testState.asStateFlow()
-
+ 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
-
+ 
     init {
         loadProviders()
     }
-
+ 
     private fun loadProviders() {
         viewModelScope.launch {
-            aiProviderRepository.getAllProviders().collect {
-                _providers.value = it
-            }
+            aiProviderRepository.getAllProviders()
+                .catch { _providers.value = emptyList() }
+                .collect {
+                    _providers.value = it
+                }
         }
     }
 

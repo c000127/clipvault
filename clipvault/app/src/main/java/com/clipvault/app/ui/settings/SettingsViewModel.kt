@@ -53,12 +53,16 @@ class SettingsViewModel @Inject constructor(
 
     private val gson = Gson()
 
-    val themeMode: StateFlow<ThemeMode> = themePreferences.themeMode
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = ThemeMode.FOLLOW_SYSTEM
-        )
+    val themeMode: StateFlow<ThemeMode> = try {
+        themePreferences.themeMode
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = ThemeMode.FOLLOW_SYSTEM
+            )
+    } catch (e: Exception) {
+        MutableStateFlow(ThemeMode.FOLLOW_SYSTEM)
+    }
 
     fun setThemeMode(mode: ThemeMode) {
         viewModelScope.launch {
@@ -80,7 +84,9 @@ class SettingsViewModel @Inject constructor(
             _exportState.value = ExportState.Loading
             try {
                 val itemsList = withContext(Dispatchers.IO) {
-                    clipItemRepository.getAllFlow().first()
+                    kotlinx.coroutines.withTimeoutOrNull(5000) {
+                        clipItemRepository.getAllFlow().first()
+                    } ?: emptyList()
                 }
 
                 val allTags = withContext(Dispatchers.IO) {

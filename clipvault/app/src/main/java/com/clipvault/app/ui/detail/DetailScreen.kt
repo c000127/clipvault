@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -27,6 +28,8 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Button
@@ -89,14 +92,16 @@ fun DetailScreen(
     val item by viewModel.item.collectAsState()
     val tags by viewModel.tags.collectAsState()
     val allTags by viewModel.allTags.collectAsState()
+    val tagPaths by viewModel.tagPaths.collectAsState()
     val fetchState by viewModel.fetchState.collectAsState()
     val aiState by viewModel.aiState.collectAsState()
+    val playingUri by viewModel.playingUri.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-
+ 
     var showAiResultSheet by remember { mutableStateOf(false) }
     var showTagEditSheet by remember { mutableStateOf(false) }
-
+ 
     // Lifecycle management for media player
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -112,16 +117,19 @@ fun DetailScreen(
             viewModel.pause()
         }
     }
-
+ 
     // Setup player when item loads
     LaunchedEffect(item) {
         item?.let {
-            if (it.type == "media") {
-                viewModel.setupPlayer()
+            if (playingUri == null) {
+                val firstMedia = it.attachments.firstOrNull { att -> att.type == "media" }
+                if (firstMedia != null) {
+                    viewModel.playMedia(firstMedia.filePath)
+                }
             }
         }
     }
-
+ 
     // Auto open AI bottom sheet when analysis finishes successfully
     LaunchedEffect(aiState) {
         if (aiState is AiState.Success) {
@@ -295,6 +303,7 @@ fun DetailScreen(
                 } else {
                     allTags.forEach { tag ->
                         val isAssociated = tags.any { it.id == tag.id }
+                        val path = tagPaths[tag.id] ?: tag.name
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -321,7 +330,13 @@ fun DetailScreen(
                                 }
                             )
                             Spacer(modifier = Modifier.width(16.dp))
-                            Text(text = tag.name, style = MaterialTheme.typography.bodyLarge)
+                            Text(
+                                text = path,
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
                     }
                 }
@@ -379,48 +394,111 @@ fun DetailScreen(
                             }
                         )
                 ) {
-                    // Content based on type
-                    when (clipItem.type) {
-                        "text" -> {
-                            Text(
-                                text = clipItem.content,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.sharedElement(
-                                    sharedContentState = rememberSharedContentState(key = "text_${clipItem.id}"),
-                                    animatedVisibilityScope = animatedVisibilityScope
-                                )
-                            )
-                        }
-                        "image" -> {
-                            AsyncImage(
-                                model = clipItem.content,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f)
-                                    .clip(BentoAsymmetricCardShape),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
-                        "link" -> {
-                            LinkContent(
-                                url = clipItem.content,
-                                fetchedContent = clipItem.fetchedContent,
-                                fetchState = fetchState,
-                                onFetch = { viewModel.fetchLinkContent() },
-                                onOpenBrowser = {
-                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(clipItem.content))
-                                    context.startActivity(intent)
-                                }
-                            )
-                        }
-                        "media" -> {
-                            MediaContent(exoPlayer = viewModel.exoPlayer)
-                        }
+                    // Content text if not empty
+                    if (clipItem.content.isNotBlank()) {
+                        Text(
+                            text = clipItem.content,
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    // Display media player if a media attachment is playing
+                    if (playingUri != null) {
+                        MediaContent(exoPlayer = viewModel.exoPlayer)
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
 
+                    // Display all attachments
+                    if (clipItem.attachments.isNotEmpty()) {
+                        Text(
+                            text = "Attachments",
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            clipItem.attachments.forEach { attachment ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        when (attachment.type) {
+                                            "image" -> {
+                                                AsyncImage(
+                                                    model = attachment.filePath,
+                                                    contentDescription = null,
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(200.dp)
+                                                        .clip(RoundedCornerShape(8.dp)),
+                                                    contentScale = ContentScale.Fit
+                                                )
+                                            }
+                                            "media" -> {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                        Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            text = attachment.filePath.substringAfterLast('/'),
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                    Button(
+                                                        onClick = { viewModel.playMedia(attachment.filePath) },
+                                                        shape = PillShape
+                                                    ) {
+                                                        Text("Play")
+                                                    }
+                                                }
+                                            }
+                                            "link" -> {
+                                                LinkContent(
+                                                    url = attachment.filePath,
+                                                    fetchedContent = clipItem.fetchedContent,
+                                                    fetchState = fetchState,
+                                                    onFetch = { viewModel.fetchLinkContent(attachment.filePath) },
+                                                    onOpenBrowser = {
+                                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(attachment.filePath))
+                                                        context.startActivity(intent)
+                                                    }
+                                                )
+                                            }
+                                            else -> {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                        Icon(Icons.Default.Save, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            text = attachment.filePath.substringAfterLast('/'),
+                                                            style = MaterialTheme.typography.bodyMedium,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+ 
                     // AI Analysis Action Button
                     Button(
                         onClick = { viewModel.analyzeContent() },
@@ -431,9 +509,9 @@ fun DetailScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("AI 智能分析")
                     }
-
+ 
                     Spacer(modifier = Modifier.height(16.dp))
-
+ 
                     // Tags section
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -449,65 +527,29 @@ fun DetailScreen(
                         }
                     }
                     Spacer(modifier = Modifier.height(8.dp))
-
+ 
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         tags.forEach { tag ->
-                            InputChip(
-                                selected = true,
-                                onClick = { viewModel.removeTag(tag.id) },
-                                label = { Text(tag.name) },
-                                trailingIcon = {
-                                    Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp))
-                                }
-                            )
-                        }
-
-                        // Add tag chips (show tags not yet associated)
-                        val availableTags = allTags.filter { tag -> tags.none { it.id == tag.id } }
-                        availableTags.take(10).forEach { tag ->
-                            InputChip(
-                                selected = false,
-                                onClick = { viewModel.addTag(tag.id) },
-                                label = { Text(tag.name) }
+                            val path = tagPaths[tag.id] ?: tag.name
+                            androidx.compose.material3.AssistChip(
+                                onClick = {},
+                                label = {
+                                    Text(
+                                        text = path,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
+                                modifier = Modifier.widthIn(max = 200.dp)
                             )
                         }
                     }
-
+ 
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    // Note section
-                    Text(
-                        text = "Notes",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    var noteText by remember(clipItem.note) { mutableStateOf(clipItem.note) }
-                    OutlinedTextField(
-                        value = noteText,
-                        onValueChange = { noteText = it },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(150.dp),
-                        label = { Text("Add notes...") },
-                        shape = RoundedCornerShape(16.dp)
-                    )
-
-                    Button(
-                        onClick = { viewModel.updateNote(noteText) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp),
-                        shape = PillShape
-                    ) {
-                        Text("Save Notes")
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
+ 
                     // Metadata
                     Text(
                         text = "Type: ${clipItem.type}",

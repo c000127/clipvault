@@ -7,6 +7,7 @@ import com.clipvault.app.data.local.dao.AiProviderDao
 import com.clipvault.app.data.local.dao.ClipItemDao
 import com.clipvault.app.data.local.dao.ItemTagDao
 import com.clipvault.app.data.local.dao.TagDao
+import com.clipvault.app.data.local.dao.ContentAttachmentDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -32,9 +33,7 @@ object DatabaseModule {
                     AppDatabase::class.java,
                     "clipvault.db"
                 )
-                // Remove fallbackToDestructiveMigration to prevent user data erasure.
-                // Room will throw an exception on schema mismatch, allowing our try-catch to catch it
-                // and fallback to in-memory, preserving the original database file.
+                .addMigrations(AppDatabase.MIGRATION_1_2)
                 .build().also {
                     dbInstance = it
                 }
@@ -72,5 +71,10 @@ object DatabaseModule {
     @Provides
     fun provideAiProviderDao(database: AppDatabase): AiProviderDao {
         return database.aiProviderDao()
+    }
+
+    @Provides
+    fun provideContentAttachmentDao(database: AppDatabase): ContentAttachmentDao {
+        return database.contentAttachmentDao()
     }
 }

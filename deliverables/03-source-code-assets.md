@@ -43,23 +43,25 @@
 | ClipVaultApplication.kt | 10 | @HiltAndroidApp 入口 | 完整 |
 | MainActivity.kt | 82 | NavHost + enableEdgeToEdge | 完整 |
 
-### 2.2 Data Layer (12 文件)
-
+### 2.2 Data Layer (16 文件)
+ 
 | 文件 | 行数 | 职责 | 注释状态 |
 |------|------|------|----------|
-| AppDatabase.kt | 30 | @Database 4 entities | 完整 |
+| AppDatabase.kt | 130 | @Database 5 entities + MIGRATION_1_2 | 完整 |
 | CryptoManager.kt | 168 | AES-256-GCM 加密 | 完整 |
-| ClipItemDao.kt | 105 | CRUD + 搜索 + Tag 过滤 | 完整 |
+| ClipItemDao.kt | 136 | CRUD + 搜索 + Tag 过滤 | 完整 |
 | TagDao.kt | 101 | CRUD + CTE 递归 + 环形检测 | 完整 |
 | ItemTagDao.kt | 58 | 关联增删查询 | 完整 |
 | AiProviderDao.kt | 76 | CRUD + 激活切换 | 完整 |
-| ClipItem.kt | 14 | items Entity | 完整 |
+| ContentAttachmentDao.kt | 30 | CRUD for attachments | 完整 |
+| ClipItem.kt | 21 | items Entity with attachments | 完整 |
+| ContentAttachment.kt | 28 | content_attachments Entity | 完整 |
 | Tag.kt | 21 | tags Entity (自引用 FK) | 完整 |
 | ItemTag.kt | 20 | item_tags 关联 Entity | 完整 |
 | AiProvider.kt | 33 | ai_providers Entity | 完整 |
 | AiService.kt | 258 | OpenAI API 封装 | 完整 |
-| ClipItemRepository.kt | 73 | 收藏仓库 | 完整 |
-| TagRepository.kt | 91 | 标签仓库 | 完整 |
+| ClipItemRepository.kt | 110 | 收藏仓库 (with attachments) | 完整 |
+| TagRepository.kt | 109 | 标签仓库 (with getTagPath) | 完整 |
 | AiProviderRepository.kt | 106 | Provider 仓库 + 加密 Key | 完整 |
 
 ### 2.3 DI Layer (2 文件)
