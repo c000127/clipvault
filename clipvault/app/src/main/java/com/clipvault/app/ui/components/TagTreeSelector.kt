@@ -45,8 +45,7 @@ fun TagTreeSelector(
 
     Column(
         modifier = modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
+            .fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         // Render top-level tags (parentId == null)
