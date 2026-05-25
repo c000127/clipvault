@@ -9,7 +9,7 @@ Complete requirements: `android_dev_prompt.md`. Source: `./clipvault/`.
 - `android sdk install/list/update` — SDK management
 - `android info` — environment info
 - `android docs search "<keywords>"` — search official Android docs
-- Skills in `.skills/` are auto-loaded
+- Skills installed to /root/.claude/skills/ and auto-loaded by Claude Code
 ## Rules
 - Follow android_dev_prompt.md architecture exactly. Do not redesign.
 - Every Task must pass `./gradlew assembleDebug` before moving on.
