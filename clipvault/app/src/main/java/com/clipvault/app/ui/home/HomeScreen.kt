@@ -366,7 +366,7 @@ private fun ClipCard(
                 containerColor = if (isSelected)
                     MaterialTheme.colorScheme.primaryContainer
                 else
-                    MaterialTheme.colorScheme.surfaceContainerLow
+                    androidx.compose.ui.graphics.Color.Transparent
             ),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             shape = BentoAsymmetricCardShape

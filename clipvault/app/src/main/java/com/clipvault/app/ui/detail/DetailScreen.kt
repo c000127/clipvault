@@ -375,6 +375,7 @@ fun DetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding)
+                        .padding(horizontal = 16.dp)
                         .verticalScroll(rememberScrollState())
                         .sharedElement(
                             sharedContentState = rememberSharedContentState(key = "clip_${clipItem.id}"),
@@ -390,10 +391,7 @@ fun DetailScreen(
                     // Content text if not empty
                     if (isEditing || clipItem.content.isNotBlank()) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                .padding(12.dp)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             if (isEditing) {
                                 OutlinedTextField(
@@ -413,35 +411,23 @@ fun DetailScreen(
                                 )
                             }
                         }
-                        androidx.compose.material3.HorizontalDivider(
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
                     // Display media player if a media attachment is playing
                     if (playingUri != null) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                .padding(12.dp)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             MediaContent(exoPlayer = viewModel.exoPlayer)
                         }
-                        androidx.compose.material3.HorizontalDivider(
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
                     // Display all attachments
                     if (clipItem.attachments.isNotEmpty()) {
                         Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                .padding(12.dp)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 text = "Attachments",
@@ -450,78 +436,79 @@ fun DetailScreen(
                             )
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 clipItem.attachments.forEach { attachment ->
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .background(
-                                                color = MaterialTheme.colorScheme.surfaceContainer,
-                                                shape = RoundedCornerShape(12.dp)
-                                            )
-                                            .padding(12.dp)
-                                    ) {
-                                        when (attachment.type) {
-                                            "image" -> {
-                                                AsyncImage(
-                                                    model = attachment.filePath,
-                                                    contentDescription = null,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(200.dp)
-                                                        .clip(RoundedCornerShape(8.dp)),
-                                                    contentScale = ContentScale.Fit
+                                    if (attachment.type == "image") {
+                                        AsyncImage(
+                                            model = attachment.filePath,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(200.dp)
+                                                .clip(RoundedCornerShape(12.dp)),
+                                            contentScale = ContentScale.Fit
+                                        )
+                                    } else {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(
+                                                    color = androidx.compose.ui.graphics.Color.Transparent,
+                                                    shape = RoundedCornerShape(12.dp)
                                                 )
-                                            }
-                                            "media" -> {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                                        Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                                        Spacer(modifier = Modifier.width(8.dp))
-                                                        Text(
-                                                            text = attachment.filePath.substringAfterLast('/'),
-                                                            style = MaterialTheme.typography.bodyMedium,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
-                                                    }
-                                                    Button(
-                                                        onClick = { viewModel.playMedia(attachment.filePath) },
-                                                        shape = PillShape
+                                                .padding(vertical = 4.dp)
+                                        ) {
+                                            when (attachment.type) {
+                                                "media" -> {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
                                                     ) {
-                                                        Text("Play")
+                                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                            Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Text(
+                                                                text = attachment.filePath.substringAfterLast('/'),
+                                                                style = MaterialTheme.typography.bodyMedium,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                        }
+                                                        Button(
+                                                            onClick = { viewModel.playMedia(attachment.filePath) },
+                                                            shape = PillShape
+                                                        ) {
+                                                            Text("Play")
+                                                        }
                                                     }
                                                 }
-                                            }
-                                            "link" -> {
-                                                LinkContent(
-                                                    url = attachment.filePath,
-                                                    fetchedContent = clipItem.fetchedContent,
-                                                    fetchState = fetchState,
-                                                    onFetch = { viewModel.fetchLinkContent(attachment.filePath) },
-                                                    onOpenBrowser = {
-                                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(attachment.filePath))
-                                                        context.startActivity(intent)
-                                                    }
-                                                )
-                                            }
-                                            else -> {
-                                                Row(
-                                                    modifier = Modifier.fillMaxWidth(),
-                                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                                        Icon(Icons.Default.Save, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                                        Spacer(modifier = Modifier.width(8.dp))
-                                                        Text(
-                                                            text = attachment.filePath.substringAfterLast('/'),
-                                                            style = MaterialTheme.typography.bodyMedium,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis
-                                                        )
+                                                "link" -> {
+                                                    LinkContent(
+                                                        url = attachment.filePath,
+                                                        fetchedContent = clipItem.fetchedContent,
+                                                        fetchState = fetchState,
+                                                        onFetch = { viewModel.fetchLinkContent(attachment.filePath) },
+                                                        onOpenBrowser = {
+                                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(attachment.filePath))
+                                                            context.startActivity(intent)
+                                                        }
+                                                    )
+                                                }
+                                                else -> {
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                            Icon(Icons.Default.Save, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                                            Spacer(modifier = Modifier.width(8.dp))
+                                                            Text(
+                                                                text = attachment.filePath.substringAfterLast('/'),
+                                                                style = MaterialTheme.typography.bodyMedium,
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
+                                                            )
+                                                        }
                                                     }
                                                 }
                                             }
@@ -530,18 +517,12 @@ fun DetailScreen(
                                 }
                             }
                         }
-                        androidx.compose.material3.HorizontalDivider(
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
+                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
                     // AI Analysis Action Button
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                            .padding(12.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Button(
                             onClick = { viewModel.analyzeContent() },
@@ -553,17 +534,11 @@ fun DetailScreen(
                             Text("AI 智能分析")
                         }
                     }
-                    androidx.compose.material3.HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Tags section
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                            .padding(12.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -604,18 +579,12 @@ fun DetailScreen(
                             }
                         }
                     }
-                    androidx.compose.material3.HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     // Metadata
                     if (clipItem.sourceApp.isNotBlank()) {
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                                .padding(12.dp)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 text = "Source: ${clipItem.sourceApp}",

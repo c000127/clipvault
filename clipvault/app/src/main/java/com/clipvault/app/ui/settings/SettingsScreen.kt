@@ -1,5 +1,6 @@
 package com.clipvault.app.ui.settings
 
+import android.net.Uri
 import android.app.Activity
 import com.clipvault.app.ui.theme.ThemeMode
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -89,6 +90,8 @@ fun SettingsScreen(
         }
     }
 
+    var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+
     // Export launcher
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -100,17 +103,25 @@ fun SettingsScreen(
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
-        uri?.let { showImportDialog = true }
+        uri?.let {
+            pendingImportUri = it
+            showImportDialog = true
+        }
     }
 
     if (showImportDialog) {
         ImportModeDialog(
             onModeSelected = { mode ->
                 showImportDialog = false
-                // Get the last URI from the launcher result
-                importLauncher.launch(arrayOf("application/json"))
+                pendingImportUri?.let { uri ->
+                    viewModel.importData(uri, mode)
+                }
+                pendingImportUri = null
             },
-            onDismiss = { showImportDialog = false }
+            onDismiss = {
+                showImportDialog = false
+                pendingImportUri = null
+            }
         )
     }
 
@@ -168,7 +179,6 @@ fun SettingsScreen(
                         }
                     }
                 }
-                androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
             }
 
             val themeMode by viewModel.themeMode.collectAsState()
@@ -197,8 +207,6 @@ fun SettingsScreen(
                 )
             }
 
-            androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
             // AI Settings
             SettingsItem(
                 icon = Icons.Default.SmartToy,
@@ -206,8 +214,6 @@ fun SettingsScreen(
                 subtitle = "Configure AI providers",
                 onClick = onAiSettings
             )
-
-            androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
             // Export
             SettingsItem(
@@ -223,8 +229,6 @@ fun SettingsScreen(
                 enabled = exportState !is ExportState.Loading
             )
 
-            androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
             // Import
             SettingsItem(
                 icon = Icons.Default.CloudDownload,
@@ -239,34 +243,30 @@ fun SettingsScreen(
                 enabled = importState !is ImportState.Loading
             )
 
-            androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
-
             Spacer(modifier = Modifier.height(16.dp))
 
             // About
-            Card(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "ClipVault",
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "Version 1.0.0",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "A powerful clipboard and note-taking app for collecting and organizing content from any source.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = "ClipVault",
+                    style = MaterialTheme.typography.titleLarge
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Version 1.0.0",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "A powerful clipboard and note-taking app for collecting and organizing content from any source.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

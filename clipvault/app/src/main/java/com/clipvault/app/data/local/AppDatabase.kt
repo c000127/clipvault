@@ -46,7 +46,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun getInstance(context: Context): AppDatabase {
             return dbInstance ?: synchronized(dbLock) {
                 dbInstance ?: try {
-                    androidx.room.Room.databaseBuilder(
+                    val db = androidx.room.Room.databaseBuilder(
                         context.applicationContext,
                         AppDatabase::class.java,
                         "clipvault.db"
@@ -55,13 +55,31 @@ abstract class AppDatabase : RoomDatabase() {
                     .setQueryCallback({ sql, args ->
                         android.util.Log.d("AppDB", "SQL: $sql | Args: $args")
                     }, { it.run() })
-                    .build().also {
+                    .build()
+
+                    // Synchronously force the database to open and run migrations/validations.
+                    // If migration or initialization fails, this throws an exception immediately.
+                    db.openHelper.writableDatabase
+
+                    db.also {
                         dbInstance = it
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("AppDatabase", "DB init failed, checking for migration error", e)
+                    android.util.Log.e("AppDatabase", "AppDatabase init/open/migration failed, falling back to in-memory database to prevent crash", e)
                     migrationFailed = true
-                    throw RuntimeException("Database initialization failed - data preserved", e)
+                    try {
+                        androidx.room.Room.inMemoryDatabaseBuilder(
+                            context.applicationContext,
+                            AppDatabase::class.java
+                        )
+                        .allowMainThreadQueries()
+                        .build().also {
+                            dbInstance = it
+                        }
+                    } catch (fallbackEx: Exception) {
+                        android.util.Log.e("AppDatabase", "Critical failure: In-memory fallback creation failed", fallbackEx)
+                        throw RuntimeException("Database initialization and in-memory fallback both failed", fallbackEx)
+                    }
                 }
             }
         }
