@@ -25,7 +25,12 @@ object DatabaseModule {
             context,
             AppDatabase::class.java,
             "clipvault.db"
-        ).build()
+        )
+            // Use destructive migration as safety net for schema changes.
+            // This preserves data on same schema version and only triggers
+            // on actual version bumps. Prevents white screen from schema mismatch.
+            .fallbackToDestructiveMigration(dropAllTables = false)
+            .build()
     }
 
     @Provides

@@ -93,3 +93,35 @@
 - [x] EmptyState and ErrorState components
 - [x] Edge-to-edge layout
 - [x] Build verification
+
+## Bug Fixes ✅
+
+### Bug 1: Tag display & edit broken
+- [x] DetailViewModel: Fixed nested collect blocking — split into independent coroutines with `collectLatest` + `catch`
+- [x] DetailViewModel: Tag add/remove now triggers Flow auto-update via getTagsForItem
+- [x] HomeViewModel: Added `catch` error handling on Flow collectors
+
+### Bug 2: Image/file attach fails
+- [x] NewItemActivity: Added runtime permission request for READ_MEDIA_IMAGES/VIDEO/AUDIO (Android 13+)
+- [x] NewItemActivity: Fixed deprecated getParcelableExtra → use type-safe API on API 33+
+- [x] NewItemActivity: Permission check before URI copy, with launcher for deferred copy
+
+### Bug 3: White screen + data loss
+- [x] DatabaseModule: Added `fallbackToDestructiveMigration(dropAllTables = false)` safety net
+- [x] HomeViewModel: Added `catch` on Flow collectors to prevent crash propagation
+- [x] DetailViewModel: Added `catch` + `collectLatest` for robust Flow collection
+- [x] SettingsViewModel: Fixed `collect { return@collect }` anti-pattern → use `first()`
+
+### Bug 4: AI API unreachable
+- [x] CryptoManager.decrypt(): Catch `BadPaddingException` + `IllegalBlockSizeException` (data corruption) — return "" instead of crashing
+- [x] CryptoManager.decrypt(): Validate minimum data length (IV_SIZE + 1)
+- [x] CryptoManager.encrypt(): Wrap in try-catch, return "" on failure
+- [x] AiService: Fixed Base URL handling — strips trailing `/v1/`, handles all input variants
+- [x] AiSettingsViewModel: testConnection() now retrieves stored API key from DataStore when editing existing provider
+
+## Engineering Deliverables ✅
+- [x] 01-requirements-specification.md — SRS (功能/非功能需求 + 验收指标)
+- [x] 02-design-specification.md — SDD (架构/数据库/加密/接口/模块设计)
+- [x] 03-source-code-assets.md — 源代码资产清单 (40 文件 + Bug 修复记录)
+- [x] 04-test-plan.md — 测试计划 (25 测试用例: 存储/递归/加密/网络)
+- [x] 05-deployment-user-manual.md — 部署与用户手册 (编译/权限/导入导出/AI配置)

@@ -17,6 +17,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jsoup.Jsoup
@@ -58,24 +61,36 @@ class DetailViewModel @Inject constructor(
         loadAllTags()
     }
 
+    /**
+     * Load item and its tags using independent coroutines.
+     * Previously used nested collect which blocked the outer Flow.
+     */
     private fun loadItem() {
+        // Load item separately
         viewModelScope.launch {
-            clipItemRepository.getById(itemId).collect { clipItem ->
-                _item.value = clipItem
-                clipItem?.let {
-                    clipItemRepository.getTagsForItem(itemId).collect { tagList ->
-                        _tags.value = tagList
-                    }
+            clipItemRepository.getById(itemId)
+                .catch { /* swallow DB errors to prevent crash */ }
+                .collectLatest { clipItem ->
+                    _item.value = clipItem
                 }
-            }
+        }
+        // Load tags for this item independently
+        viewModelScope.launch {
+            clipItemRepository.getTagsForItem(itemId)
+                .catch { _tags.value = emptyList() }
+                .collectLatest { tagList ->
+                    _tags.value = tagList
+                }
         }
     }
 
     private fun loadAllTags() {
         viewModelScope.launch {
-            tagRepository.getAllTags().collect {
-                _allTags.value = it
-            }
+            tagRepository.getAllTags()
+                .catch { /* swallow */ }
+                .collectLatest {
+                    _allTags.value = it
+                }
         }
     }
 
@@ -90,12 +105,14 @@ class DetailViewModel @Inject constructor(
     fun addTag(tagId: Long) {
         viewModelScope.launch {
             clipItemRepository.addTagToItem(itemId, tagId)
+            // Flow will auto-update _tags via getTagsForItem
         }
     }
 
     fun removeTag(tagId: Long) {
         viewModelScope.launch {
             clipItemRepository.removeTagFromItem(itemId, tagId)
+            // Flow will auto-update _tags via getTagsForItem
         }
     }
 

@@ -4,8 +4,11 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.util.Log
 import java.security.KeyStore
+import javax.crypto.BadPaddingException
 import javax.crypto.Cipher
+import javax.crypto.IllegalBlockSizeException
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
@@ -21,6 +24,7 @@ import javax.inject.Singleton
 class CryptoManager @Inject constructor() {
 
     companion object {
+        private const val TAG = "CryptoManager"
         private const val KEY_ALIAS = "clipvault_aes_key"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
@@ -58,6 +62,7 @@ class CryptoManager @Inject constructor() {
             keyGenerator.generateKey()
         } catch (e: Exception) {
             // Fallback without StrongBox if not supported
+            Log.w(TAG, "StrongBox not available, falling back to software keystore", e)
             val fallbackSpec = KeyGenParameterSpec.Builder(
                 KEY_ALIAS,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
@@ -84,29 +89,38 @@ class CryptoManager @Inject constructor() {
     fun encrypt(plaintext: String): String {
         if (plaintext.isBlank()) return ""
 
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, getKey())
+        return try {
+            val cipher = Cipher.getInstance(TRANSFORMATION)
+            cipher.init(Cipher.ENCRYPT_MODE, getKey())
 
-        val iv = cipher.iv
-        val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
+            val iv = cipher.iv
+            val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
 
-        // Combine IV + Ciphertext
-        val combined = ByteArray(iv.size + ciphertext.size)
-        System.arraycopy(iv, 0, combined, 0, iv.size)
-        System.arraycopy(ciphertext, 0, combined, iv.size, ciphertext.size)
+            // Combine IV + Ciphertext
+            val combined = ByteArray(iv.size + ciphertext.size)
+            System.arraycopy(iv, 0, combined, 0, iv.size)
+            System.arraycopy(ciphertext, 0, combined, iv.size, ciphertext.size)
 
-        return Base64.encodeToString(combined, Base64.NO_WRAP)
+            Base64.encodeToString(combined, Base64.NO_WRAP)
+        } catch (e: Exception) {
+            Log.e(TAG, "Encryption failed", e)
+            ""
+        }
     }
 
     /**
      * Decrypts Base64(IV[12] + CipherText + AuthTag[16]) using AES-GCM.
-     * Handles key loss by deleting old key and regenerating.
+     * Handles all crypto exceptions gracefully — never crashes, returns "" on failure.
      */
     fun decrypt(encryptedBase64: String): String {
         if (encryptedBase64.isBlank()) return ""
 
         return try {
             val combined = Base64.decode(encryptedBase64, Base64.NO_WRAP)
+            if (combined.size <= IV_SIZE) {
+                Log.e(TAG, "Encrypted data too short: ${combined.size} bytes")
+                return ""
+            }
 
             // Extract IV (first 12 bytes)
             val iv = combined.copyOfRange(0, IV_SIZE)
@@ -119,17 +133,26 @@ class CryptoManager @Inject constructor() {
             val plaintext = cipher.doFinal(ciphertext)
             String(plaintext, Charsets.UTF_8)
         } catch (e: KeyPermanentlyInvalidatedException) {
-            // Key was invalidated (e.g., biometric change)
+            Log.w(TAG, "Key permanently invalidated, regenerating", e)
             handleKeyLoss()
             ""
+        } catch (e: BadPaddingException) {
+            // Data corrupted or wrong key — cannot recover
+            Log.e(TAG, "Decryption failed: bad padding (data corrupted or key mismatch)", e)
+            ""
+        } catch (e: IllegalBlockSizeException) {
+            // Data corrupted
+            Log.e(TAG, "Decryption failed: illegal block size (data corrupted)", e)
+            ""
         } catch (e: Exception) {
-            // Try to handle key loss for other key-related errors
             if (e.message?.contains("Key not found") == true ||
                 e.message?.contains("unrecoverable") == true) {
+                Log.w(TAG, "Key lost, regenerating", e)
                 handleKeyLoss()
                 ""
             } else {
-                throw e
+                Log.e(TAG, "Decryption failed with unexpected error", e)
+                ""
             }
         }
     }

@@ -76,7 +76,7 @@ class AiSettingsViewModel @Inject constructor(
             id = provider.id,
             name = provider.name,
             baseUrl = provider.baseUrl,
-            apiKey = "", // Don't show stored key
+            apiKey = "", // Don't show stored key for security
             modelName = provider.modelName,
             supportsVision = provider.supportsVision,
             maxTokens = provider.maxTokens,
@@ -159,15 +159,35 @@ class AiSettingsViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Test connection with the current form state.
+     * If editing an existing provider and the API key field is blank,
+     * retrieves the stored key from DataStore.
+     */
     fun testConnection() {
         val form = _formState.value
-        if (form.apiKey.isBlank()) {
-            _testState.value = TestState.Error("Please enter an API Key")
-            return
-        }
 
         viewModelScope.launch {
             _testState.value = TestState.Loading
+
+            // Resolve the API key: use form input, or fall back to stored key for existing providers
+            val apiKey = when {
+                form.apiKey.isNotBlank() -> form.apiKey
+                form.id > 0 -> {
+                    // Editing existing provider — retrieve stored key
+                    val storedKey = aiProviderRepository.getApiKey(form.id)
+                    if (storedKey.isBlank()) {
+                        _testState.value = TestState.Error("No API Key stored. Please enter one.")
+                        return@launch
+                    }
+                    storedKey
+                }
+                else -> {
+                    _testState.value = TestState.Error("Please enter an API Key")
+                    return@launch
+                }
+            }
+
             val provider = AiProvider(
                 name = form.name,
                 baseUrl = form.baseUrl.trimEnd('/'),
@@ -178,7 +198,7 @@ class AiSettingsViewModel @Inject constructor(
                 systemPrompt = form.systemPrompt
             )
 
-            val result = aiService.testConnection(provider, form.apiKey)
+            val result = aiService.testConnection(provider, apiKey)
             _testState.value = when (result) {
                 is AiResult.Success -> TestState.Success("Connection successful!")
                 is AiResult.Error -> TestState.Error(result.message)

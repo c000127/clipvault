@@ -11,13 +11,13 @@ import com.clipvault.app.data.repository.AiProviderRepository
 import com.clipvault.app.data.repository.ClipItemRepository
 import com.clipvault.app.data.repository.TagRepository
 import com.google.gson.Gson
-import com.google.gson.JsonParser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -58,10 +58,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _exportState.value = ExportState.Loading
             try {
-                val items = clipItemRepository.getAllFlow()
-                // Collect first emission
-                var itemsList: List<ClipItem> = emptyList()
-                items.collect { itemsList = it; return@collect }
+                val itemsList = clipItemRepository.getAllFlow().first()
 
                 val allTags = tagRepository.getAllTagsOnce()
                 val allItemTags = mutableListOf<ItemTag>()
@@ -123,10 +120,8 @@ class SettingsViewModel @Inject constructor(
 
     private suspend fun importOverwrite(data: ExportData) {
         // Clear all existing data
-        val existingItems = clipItemRepository.getAllFlow()
-        var itemsList: List<ClipItem> = emptyList()
-        existingItems.collect { itemsList = it; return@collect }
-        clipItemRepository.deleteByIds(itemsList.map { it.id })
+        val existingItems = clipItemRepository.getAllFlow().first()
+        clipItemRepository.deleteByIds(existingItems.map { it.id })
 
         val existingTags = tagRepository.getAllTagsOnce()
         existingTags.forEach { tagRepository.delete(it) }

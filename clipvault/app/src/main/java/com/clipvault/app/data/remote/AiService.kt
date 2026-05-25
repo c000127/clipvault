@@ -30,6 +30,30 @@ class AiService @Inject constructor() {
         .writeTimeout(15, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * Build the chat completions URL from the provider's base URL.
+     * Handles all common input variants:
+     *   - https://api.openai.com/v1
+     *   - https://api.openai.com/v1/
+     *   - https://api.openai.com
+     *   - https://api.openai.com/
+     *   - https://api.openai.com/v1/chat/completions
+     */
+    private fun buildChatUrl(baseUrl: String): String {
+        var url = baseUrl.trimEnd('/')
+
+        // If URL already ends with /chat/completions, use as-is
+        if (url.endsWith("/chat/completions")) return url
+
+        // Remove trailing /v1 if present (we'll add it back)
+        if (url.endsWith("/v1")) {
+            url = url.removeSuffix("/v1")
+        }
+
+        // Build final URL
+        return "$url/v1/chat/completions"
+    }
+
     suspend fun analyze(
         provider: AiProvider,
         apiKey: String,
@@ -38,12 +62,7 @@ class AiService @Inject constructor() {
         imagePath: String? = null
     ): AiResult = withContext(Dispatchers.IO) {
         try {
-            val baseUrl = provider.baseUrl.trimEnd('/')
-            val url = if (baseUrl.endsWith("/v1")) {
-                "$baseUrl/chat/completions"
-            } else {
-                "$baseUrl/v1/chat/completions"
-            }
+            val url = buildChatUrl(provider.baseUrl)
 
             val messages = buildMessages(provider.systemPrompt, content, contentType, imagePath, provider.supportsVision)
             val requestBody = buildRequestBody(provider, messages)
@@ -79,12 +98,7 @@ class AiService @Inject constructor() {
         apiKey: String
     ): AiResult = withContext(Dispatchers.IO) {
         try {
-            val baseUrl = provider.baseUrl.trimEnd('/')
-            val url = if (baseUrl.endsWith("/v1")) {
-                "$baseUrl/chat/completions"
-            } else {
-                "$baseUrl/v1/chat/completions"
-            }
+            val url = buildChatUrl(provider.baseUrl)
 
             val messages = listOf(
                 mapOf("role" to "user", "content" to "Say 'Hello'")
