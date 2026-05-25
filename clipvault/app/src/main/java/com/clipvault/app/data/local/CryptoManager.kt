@@ -32,56 +32,77 @@ class CryptoManager @Inject constructor() {
         private const val TAG_SIZE = 128
     }
 
-    private val keyStore: KeyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply {
-        load(null)
-    }
+    private var keyStore: KeyStore? = null
+    private var isInitialized = false
 
-    init {
-        if (!keyStore.containsAlias(KEY_ALIAS)) {
-            generateKey()
+    @Synchronized
+    private fun ensureInitialized() {
+        if (isInitialized) return
+        try {
+            val ks = KeyStore.getInstance(ANDROID_KEYSTORE)
+            ks.load(null)
+            keyStore = ks
+            if (!ks.containsAlias(KEY_ALIAS)) {
+                generateKeyInternal()
+            }
+            isInitialized = true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to initialize KeyStore, cryptography will be unavailable", e)
+            isInitialized = false
         }
     }
 
     private fun generateKey() {
-        val keyGenerator = KeyGenerator.getInstance(
-            KeyProperties.KEY_ALGORITHM_AES,
-            ANDROID_KEYSTORE
-        )
-        val spec = KeyGenParameterSpec.Builder(
-            KEY_ALIAS,
-            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-        )
-            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-            .setKeySize(256)
-            .setIsStrongBoxBacked(true)
-            .build()
+        ensureInitialized()
+        generateKeyInternal()
+    }
 
+    private fun generateKeyInternal() {
         try {
-            keyGenerator.init(spec)
-            keyGenerator.generateKey()
-        } catch (e: Exception) {
-            // Fallback without StrongBox if not supported
-            Log.w(TAG, "StrongBox not available, falling back to software keystore", e)
-            val fallbackSpec = KeyGenParameterSpec.Builder(
+            val keyGenerator = KeyGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_AES,
+                ANDROID_KEYSTORE
+            )
+            val spec = KeyGenParameterSpec.Builder(
                 KEY_ALIAS,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
             )
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(256)
+                .setIsStrongBoxBacked(true)
                 .build()
-            keyGenerator.init(fallbackSpec)
-            keyGenerator.generateKey()
+
+            try {
+                keyGenerator.init(spec)
+                keyGenerator.generateKey()
+            } catch (e: Exception) {
+                // Fallback without StrongBox if not supported
+                Log.w(TAG, "StrongBox not available, falling back to software keystore", e)
+                val fallbackSpec = KeyGenParameterSpec.Builder(
+                    KEY_ALIAS,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+                )
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(256)
+                    .build()
+                keyGenerator.init(fallbackSpec)
+                keyGenerator.generateKey()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to generate key in Android Keystore", e)
         }
     }
 
-    private fun getKey(): SecretKey {
+    private fun getKey(): SecretKey? {
+        ensureInitialized()
+        val ks = keyStore ?: return null
         try {
-            if (!keyStore.containsAlias(KEY_ALIAS)) {
-                generateKey()
+            if (!ks.containsAlias(KEY_ALIAS)) {
+                generateKeyInternal()
             }
-            val entry = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
+            val entry = ks.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
             if (entry != null) {
                 return entry.secretKey
             }
@@ -89,10 +110,14 @@ class CryptoManager @Inject constructor() {
             Log.w(TAG, "Error getting key from Keystore, attempting regeneration", e)
         }
         // If entry is null or exception occurred, regenerate key and try one more time
-        generateKey()
-        val entry = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
-            ?: throw IllegalStateException("Key not found in Keystore after regeneration")
-        return entry.secretKey
+        generateKeyInternal()
+        return try {
+            val entry = ks.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
+            entry?.secretKey
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to retrieve secret key after regeneration", e)
+            null
+        }
     }
 
     /**
@@ -101,6 +126,11 @@ class CryptoManager @Inject constructor() {
      */
     fun encrypt(plaintext: String): String {
         if (plaintext.isBlank()) return ""
+        ensureInitialized()
+        if (!isInitialized) {
+            Log.e(TAG, "Cannot encrypt: CryptoManager is not initialized")
+            return ""
+        }
 
         return try {
             encryptInternal(plaintext)
@@ -132,8 +162,9 @@ class CryptoManager @Inject constructor() {
     }
 
     private fun encryptInternal(plaintext: String): String {
+        val key = getKey() ?: throw IllegalStateException("Keystore key not available")
         val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, getKey())
+        cipher.init(Cipher.ENCRYPT_MODE, key)
 
         val iv = cipher.iv
         val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
@@ -153,6 +184,11 @@ class CryptoManager @Inject constructor() {
     fun decrypt(encryptedBase64: String): String {
         val trimmed = encryptedBase64.trim()
         if (trimmed.isBlank()) return ""
+        ensureInitialized()
+        if (!isInitialized) {
+            Log.e(TAG, "Cannot decrypt: CryptoManager is not initialized")
+            return ""
+        }
 
         return try {
             // Try Base64.NO_WRAP first, fall back to DEFAULT if it fails
@@ -171,9 +207,10 @@ class CryptoManager @Inject constructor() {
             val iv = combined.copyOfRange(0, IV_SIZE)
             val ciphertext = combined.copyOfRange(IV_SIZE, combined.size)
 
+            val key = getKey() ?: throw IllegalStateException("Keystore key not available")
             val cipher = Cipher.getInstance(TRANSFORMATION)
             val spec = GCMParameterSpec(TAG_SIZE, iv)
-            cipher.init(Cipher.DECRYPT_MODE, getKey(), spec)
+            cipher.init(Cipher.DECRYPT_MODE, key, spec)
 
             val plaintext = cipher.doFinal(ciphertext)
             String(plaintext, Charsets.UTF_8)
@@ -208,16 +245,19 @@ class CryptoManager @Inject constructor() {
      */
     private fun handleKeyLoss() {
         try {
-            keyStore.deleteEntry(KEY_ALIAS)
+            keyStore?.deleteEntry(KEY_ALIAS)
         } catch (_: Exception) {}
-        generateKey()
+        generateKeyInternal()
     }
 
     /**
      * Deletes the encryption key. Use when clearing all encrypted data.
      */
     fun deleteKey() {
-        keyStore.deleteEntry(KEY_ALIAS)
-        generateKey()
+        ensureInitialized()
+        try {
+            keyStore?.deleteEntry(KEY_ALIAS)
+        } catch (_: Exception) {}
+        generateKeyInternal()
     }
 }

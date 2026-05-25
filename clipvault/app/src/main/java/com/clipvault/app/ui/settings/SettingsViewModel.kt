@@ -10,7 +10,6 @@ import com.clipvault.app.data.local.AppDatabase
 import com.clipvault.app.data.local.entity.ClipItem
 import com.clipvault.app.data.local.entity.ItemTag
 import com.clipvault.app.data.local.entity.Tag
-import com.clipvault.app.data.repository.AiProviderRepository
 import com.clipvault.app.data.repository.ClipItemRepository
 import com.clipvault.app.data.repository.TagRepository
 import com.clipvault.app.ui.theme.ThemeMode
@@ -48,7 +47,6 @@ class SettingsViewModel @Inject constructor(
     private val database: AppDatabase,
     private val clipItemRepository: ClipItemRepository,
     private val tagRepository: TagRepository,
-    private val aiProviderRepository: AiProviderRepository,
     private val themePreferences: ThemePreferences
 ) : ViewModel() {
 

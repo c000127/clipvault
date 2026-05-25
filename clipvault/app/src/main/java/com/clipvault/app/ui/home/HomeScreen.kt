@@ -136,6 +136,10 @@ fun HomeScreen(
         topBar = {
             TopAppBar(
                 title = { Text("ClipVault") },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                    containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                ),
                 actions = {
                     IconButton(onClick = { showTagFilter = true }) {
                         Icon(
@@ -170,17 +174,21 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Search bar (pill shape)
-            TextField(
+            // Search bar (borderless, full width, merged with background)
+            androidx.compose.material3.OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { viewModel.onSearchQueryChange(it) },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .fillMaxWidth(),
                 placeholder = { Text("Search clips...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 singleLine = true,
-                shape = PillShape
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                    unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                    focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent
+                )
             )
 
             // Selected tags chips under search bar
@@ -202,9 +210,9 @@ fun HomeScreen(
                 FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = com.clipvault.app.ui.theme.Dimensions.pageHorizontal, vertical = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(com.clipvault.app.ui.theme.Dimensions.itemSpacing),
+                    verticalArrangement = Arrangement.spacedBy(com.clipvault.app.ui.theme.Dimensions.itemSpacing)
                 ) {
                     selectedTags.forEach { tag ->
                         InputChip(
@@ -255,9 +263,9 @@ fun HomeScreen(
                         LazyVerticalStaggeredGrid(
                             columns = StaggeredGridCells.Fixed(2),
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalItemSpacing = 12.dp
+                            contentPadding = PaddingValues(com.clipvault.app.ui.theme.Dimensions.sectionGap),
+                            horizontalArrangement = Arrangement.spacedBy(com.clipvault.app.ui.theme.Dimensions.sectionGap),
+                            verticalItemSpacing = com.clipvault.app.ui.theme.Dimensions.sectionGap
                         ) {
                             pagingItems(
                                 items = pagingItems,
@@ -301,7 +309,7 @@ fun HomeScreen(
         }
     }
 }
-
+ 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun ClipCard(
@@ -358,8 +366,9 @@ private fun ClipCard(
                 containerColor = if (isSelected)
                     MaterialTheme.colorScheme.primaryContainer
                 else
-                    MaterialTheme.colorScheme.surfaceContainer
+                    MaterialTheme.colorScheme.surfaceContainerLow
             ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             shape = BentoAsymmetricCardShape
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
@@ -374,7 +383,7 @@ private fun ClipCard(
                             .clip(MaterialTheme.shapes.medium),
                         contentScale = ContentScale.Crop
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(com.clipvault.app.ui.theme.Dimensions.itemSpacing))
                 }
  
                 // Display attachment type indicators
@@ -421,7 +430,7 @@ private fun ClipCard(
                     )
                 }
  
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(com.clipvault.app.ui.theme.Dimensions.itemSpacing))
  
                 // Timestamp
                 Text(

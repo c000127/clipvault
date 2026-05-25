@@ -2,6 +2,7 @@ package com.clipvault.app.ui.detail
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -336,6 +337,10 @@ fun DetailScreen(
         topBar = {
             TopAppBar(
                 title = { Text("Detail") },
+                colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                    containerColor = androidx.compose.ui.graphics.Color.Transparent,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                ),
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -371,7 +376,6 @@ fun DetailScreen(
                         .fillMaxSize()
                         .padding(innerPadding)
                         .verticalScroll(rememberScrollState())
-                        .padding(16.dp)
                         .sharedElement(
                             sharedContentState = rememberSharedContentState(key = "clip_${clipItem.id}"),
                             animatedVisibilityScope = animatedVisibilityScope,
@@ -384,47 +388,77 @@ fun DetailScreen(
                         )
                 ) {
                     // Content text if not empty
-                    if (isEditing) {
-                        OutlinedTextField(
-                            value = editContent,
-                            onValueChange = { viewModel.updateEditContent(it) },
+                    if (isEditing || clipItem.content.isNotBlank()) {
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(200.dp),
-                            label = { Text("Content") },
-                            shape = RoundedCornerShape(16.dp)
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .padding(12.dp)
+                        ) {
+                            if (isEditing) {
+                                OutlinedTextField(
+                                    value = editContent,
+                                    onValueChange = { viewModel.updateEditContent(it) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp),
+                                    label = { Text("Content") },
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = clipItem.content,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                        androidx.compose.material3.HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
                         )
-                        Spacer(modifier = Modifier.height(16.dp))
-                    } else if (clipItem.content.isNotBlank()) {
-                        Text(
-                            text = clipItem.content,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
                     }
 
                     // Display media player if a media attachment is playing
                     if (playingUri != null) {
-                        MediaContent(exoPlayer = viewModel.exoPlayer)
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .padding(12.dp)
+                        ) {
+                            MediaContent(exoPlayer = viewModel.exoPlayer)
+                        }
+                        androidx.compose.material3.HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
                     }
 
                     // Display all attachments
                     if (clipItem.attachments.isNotEmpty()) {
-                        Text(
-                            text = "Attachments",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            clipItem.attachments.forEach { attachment ->
-                                androidx.compose.material3.Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    color = MaterialTheme.colorScheme.surfaceContainer,
-                                    shape = RoundedCornerShape(12.dp)
-                                ) {
-                                    Column(modifier = Modifier.padding(12.dp)) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = "Attachments",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                clipItem.attachments.forEach { attachment ->
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(
+                                                color = MaterialTheme.colorScheme.surfaceContainer,
+                                                shape = RoundedCornerShape(12.dp)
+                                            )
+                                            .padding(12.dp)
+                                    ) {
                                         when (attachment.type) {
                                             "image" -> {
                                                 AsyncImage(
@@ -496,67 +530,99 @@ fun DetailScreen(
                                 }
                             }
                         }
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
- 
-                    // AI Analysis Action Button
-                    Button(
-                        onClick = { viewModel.analyzeContent() },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = PillShape
-                    ) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("AI 智能分析")
-                    }
- 
-                    Spacer(modifier = Modifier.height(16.dp))
- 
-                    // Tags section
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Tags",
-                            style = MaterialTheme.typography.titleMedium
+                        androidx.compose.material3.HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
                         )
-                        IconButton(onClick = { showTagEditSheet = true }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit Tags")
-                        }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
- 
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+
+                    // AI Analysis Action Button
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .padding(12.dp)
                     ) {
-                        tags.forEach { tag ->
-                            val path = tagPaths[tag.id] ?: tag.name
-                            androidx.compose.material3.AssistChip(
-                                onClick = {},
-                                label = {
-                                    Text(
-                                        text = path,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                },
-                                modifier = Modifier.widthIn(max = 200.dp)
-                            )
+                        Button(
+                            onClick = { viewModel.analyzeContent() },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = PillShape
+                        ) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("AI 智能分析")
                         }
                     }
- 
-                    Spacer(modifier = Modifier.height(16.dp))
- 
+                    androidx.compose.material3.HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
+                    // Tags section
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                            .padding(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Tags",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            IconButton(onClick = { showTagEditSheet = true }) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit Tags")
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            tags.forEach { tag ->
+                                val path = tagPaths[tag.id] ?: tag.name
+                                androidx.compose.material3.AssistChip(
+                                    onClick = {},
+                                    label = {
+                                        Text(
+                                            text = path,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    border = null,
+                                    colors = androidx.compose.material3.AssistChipDefaults.assistChipColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                    ),
+                                    modifier = Modifier.widthIn(max = 200.dp)
+                                )
+                            }
+                        }
+                    }
+                    androidx.compose.material3.HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
                     // Metadata
                     if (clipItem.sourceApp.isNotBlank()) {
-                        Text(
-                            text = "Source: ${clipItem.sourceApp}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = "Source: ${clipItem.sourceApp}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

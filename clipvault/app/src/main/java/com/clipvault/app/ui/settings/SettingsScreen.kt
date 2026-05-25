@@ -133,6 +133,44 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
         ) {
+            if (com.clipvault.app.data.local.AppDatabase.migrationFailed) {
+                Card(
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Warning",
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Database Migration Failed",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "There was an issue migrating your local database. Pre-existing clips and tags were preserved, but we recommend exporting a backup JSON immediately and reinstalling the app if issues persist.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+                androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            }
+
             val themeMode by viewModel.themeMode.collectAsState()
             var showThemeDialog by remember { mutableStateOf(false) }
 
@@ -159,6 +197,8 @@ fun SettingsScreen(
                 )
             }
 
+            androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
             // AI Settings
             SettingsItem(
                 icon = Icons.Default.SmartToy,
@@ -166,6 +206,8 @@ fun SettingsScreen(
                 subtitle = "Configure AI providers",
                 onClick = onAiSettings
             )
+
+            androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
             // Export
             SettingsItem(
@@ -181,6 +223,8 @@ fun SettingsScreen(
                 enabled = exportState !is ExportState.Loading
             )
 
+            androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
             // Import
             SettingsItem(
                 icon = Icons.Default.CloudDownload,
@@ -194,6 +238,8 @@ fun SettingsScreen(
                 onClick = { importLauncher.launch(arrayOf("application/json")) },
                 enabled = importState !is ImportState.Loading
             )
+
+            androidx.compose.material3.HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -238,7 +284,7 @@ private fun SettingsItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(

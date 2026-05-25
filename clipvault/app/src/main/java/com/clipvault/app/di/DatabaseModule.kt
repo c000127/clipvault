@@ -19,49 +19,10 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
-    private val dbLock = Any()
-    @Volatile
-    private var dbInstance: AppDatabase? = null
-
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
-        return dbInstance ?: synchronized(dbLock) {
-            dbInstance ?: try {
-                Room.databaseBuilder(
-                    context,
-                    AppDatabase::class.java,
-                    "clipvault.db"
-                )
-                .addMigrations(AppDatabase.MIGRATION_1_2)
-                .fallbackToDestructiveMigration(true)  // 迁移失败时重建而非 crash
-                .setQueryCallback({ sql, args ->
-                    android.util.Log.d("AppDB", "SQL: $sql | Args: $args")
-                }, { it.run() })
-                .build().also {
-                    dbInstance = it
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("DatabaseModule", "DB init failed, falling back to destructive migration", e)
-                try {
-                    Room.databaseBuilder(
-                        context,
-                        AppDatabase::class.java,
-                        "clipvault.db"
-                    )
-                    .fallbackToDestructiveMigration(true)
-                    .setQueryCallback({ sql, args ->
-                        android.util.Log.d("AppDB", "SQL: $sql | Args: $args")
-                    }, { it.run() })
-                    .build().also {
-                        dbInstance = it
-                    }
-                } catch (ex: Exception) {
-                    android.util.Log.e("DatabaseModule", "Fatal: Failed to initialize even with destructive migration", ex)
-                    throw RuntimeException("Fatal: Failed to initialize database", ex)
-                }
-            }
-        }
+        return AppDatabase.getInstance(context)
     }
 
     @Provides
