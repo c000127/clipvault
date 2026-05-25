@@ -108,6 +108,9 @@ fun DetailScreen(
     var showAiResultSheet by remember { mutableStateOf(false) }
     var showTagEditSheet by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+
+    val isFullyVisible = animatedVisibilityScope.transition.currentState == androidx.compose.animation.EnterExitState.Visible &&
+            animatedVisibilityScope.transition.targetState == androidx.compose.animation.EnterExitState.Visible
  
     // Lifecycle management for media player
     DisposableEffect(lifecycleOwner) {
@@ -369,25 +372,38 @@ fun DetailScreen(
                     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
                 ),
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        enabled = isFullyVisible
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
                 actions = {
                     if (isEditing) {
-                        IconButton(onClick = { viewModel.saveEdit() }) {
+                        IconButton(
+                            onClick = { viewModel.saveEdit() },
+                            enabled = isFullyVisible
+                        ) {
                             Icon(Icons.Default.Check, contentDescription = "Save")
                         }
-                        IconButton(onClick = { viewModel.cancelEdit() }) {
+                        IconButton(
+                            onClick = { viewModel.cancelEdit() },
+                            enabled = isFullyVisible
+                        ) {
                             Icon(Icons.Default.Close, contentDescription = "Cancel")
                         }
                     } else {
-                        IconButton(onClick = { viewModel.startEdit() }) {
+                        IconButton(
+                            onClick = { viewModel.startEdit() },
+                            enabled = isFullyVisible
+                        ) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit")
                         }
-                        IconButton(onClick = {
-                            showDeleteDialog = true
-                        }) {
+                        IconButton(
+                            onClick = { showDeleteDialog = true },
+                            enabled = isFullyVisible
+                        ) {
                             Icon(Icons.Default.Delete, contentDescription = "Delete")
                         }
                     }
