@@ -22,8 +22,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -70,6 +72,8 @@ import java.util.Locale
 fun HomeScreen(
     onItemClick: (Long) -> Unit,
     onNewItem: () -> Unit,
+    onTagManager: () -> Unit = {},
+    onSettings: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -105,6 +109,12 @@ fun HomeScreen(
                 actions = {
                     IconButton(onClick = { showTagFilter = true }) {
                         Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                    }
+                    IconButton(onClick = onTagManager) {
+                        Icon(Icons.Default.Label, contentDescription = "Tags")
+                    }
+                    IconButton(onClick = onSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 }
             )

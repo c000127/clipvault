@@ -58,3 +58,38 @@
 - [x] Image/file picker integration
 - [x] Tag selection
 - [x] Build verification
+
+## Task 7 — Tag Manager Screen ✅
+- [x] TagManagerScreen with tree view
+- [x] TagManagerViewModel with expand/collapse
+- [x] Create/Rename/Delete/Move tag operations
+- [x] Delete with @Transaction reparenting
+- [x] Build verification
+
+## Task 8 — AI Integration + AI Settings ✅
+- [x] AiService with OpenAI Chat Completions API
+- [x] Sealed AiResult (Success/Error)
+- [x] AiSettingsScreen with provider management
+- [x] Test connection button
+- [x] Build verification
+
+## Task 9 — General Settings ✅
+- [x] SettingsScreen with navigation
+- [x] Export JSON via SAF
+- [x] Import JSON via SAF (Overwrite/Merge modes)
+- [x] About section
+- [x] Build verification
+
+## Task 10 — Data Encryption ✅
+- [x] CryptoManager with AES-GCM (Android Keystore)
+- [x] API Key encrypted storage in DataStore
+- [x] AiProviderRepository encryption integration
+- [x] Build verification
+
+## Task 11 — Theme System ✅
+- [x] Material You Dynamic Color support
+- [x] Dark/Light theme with OLED black
+- [x] ThemePreferences DataStore (theme_mode key)
+- [x] EmptyState and ErrorState components
+- [x] Edge-to-edge layout
+- [x] Build verification
