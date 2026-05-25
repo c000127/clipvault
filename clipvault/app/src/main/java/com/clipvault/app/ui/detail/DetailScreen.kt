@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.clickable
@@ -96,6 +97,8 @@ fun DetailScreen(
     val fetchState by viewModel.fetchState.collectAsState()
     val aiState by viewModel.aiState.collectAsState()
     val playingUri by viewModel.playingUri.collectAsState()
+    val isEditing by viewModel.isEditing.collectAsState()
+    val editContent by viewModel.editContent.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
  
@@ -301,44 +304,18 @@ fun DetailScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
-                    allTags.forEach { tag ->
-                        val isAssociated = tags.any { it.id == tag.id }
-                        val path = tagPaths[tag.id] ?: tag.name
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    if (isAssociated) {
-                                        viewModel.removeTag(tag.id)
-                                    } else {
-                                        viewModel.addTag(tag.id)
-                                    }
-                                }
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = isAssociated,
-                                onCheckedChange = { checked ->
-                                    if (checked != null) {
-                                        if (checked) {
-                                            viewModel.addTag(tag.id)
-                                        } else {
-                                            viewModel.removeTag(tag.id)
-                                        }
-                                    }
-                                }
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text(
-                                text = path,
-                                style = MaterialTheme.typography.bodyLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
+                    com.clipvault.app.ui.components.TagTreeSelector(
+                        allTags = allTags,
+                        selectedTagIds = tags.map { it.id }.toSet(),
+                        tagPaths = tagPaths,
+                        onTagToggle = { tagId, selected ->
+                            if (selected) {
+                                viewModel.addTag(tagId)
+                            } else {
+                                viewModel.removeTag(tagId)
+                            }
                         }
-                    }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -365,11 +342,23 @@ fun DetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        viewModel.deleteItem()
-                        onBack()
-                    }) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                    if (isEditing) {
+                        IconButton(onClick = { viewModel.saveEdit() }) {
+                            Icon(Icons.Default.Check, contentDescription = "Save")
+                        }
+                        IconButton(onClick = { viewModel.cancelEdit() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel")
+                        }
+                    } else {
+                        IconButton(onClick = { viewModel.startEdit() }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit")
+                        }
+                        IconButton(onClick = {
+                            viewModel.deleteItem()
+                            onBack()
+                        }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                        }
                     }
                 }
             )
@@ -395,7 +384,18 @@ fun DetailScreen(
                         )
                 ) {
                     // Content text if not empty
-                    if (clipItem.content.isNotBlank()) {
+                    if (isEditing) {
+                        OutlinedTextField(
+                            value = editContent,
+                            onValueChange = { viewModel.updateEditContent(it) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp),
+                            label = { Text("Content") },
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    } else if (clipItem.content.isNotBlank()) {
                         Text(
                             text = clipItem.content,
                             style = MaterialTheme.typography.bodyLarge,
@@ -419,9 +419,9 @@ fun DetailScreen(
                         )
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             clipItem.attachments.forEach { attachment ->
-                                Card(
+                                androidx.compose.material3.Surface(
                                     modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                                    color = MaterialTheme.colorScheme.surfaceContainer,
                                     shape = RoundedCornerShape(12.dp)
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
@@ -551,11 +551,6 @@ fun DetailScreen(
                     Spacer(modifier = Modifier.height(16.dp))
  
                     // Metadata
-                    Text(
-                        text = "Type: ${clipItem.type}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     if (clipItem.sourceApp.isNotBlank()) {
                         Text(
                             text = "Source: ${clipItem.sourceApp}",

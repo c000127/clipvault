@@ -74,6 +74,12 @@ class DetailViewModel @Inject constructor(
 
     private val _playingUri = MutableStateFlow<String?>(null)
     val playingUri: StateFlow<String?> = _playingUri.asStateFlow()
+
+    private val _isEditing = MutableStateFlow(false)
+    val isEditing: StateFlow<Boolean> = _isEditing.asStateFlow()
+
+    private val _editContent = MutableStateFlow("")
+    val editContent: StateFlow<String> = _editContent.asStateFlow()
  
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
  
@@ -204,7 +210,32 @@ class DetailViewModel @Inject constructor(
         exoPlayer.pause()
     }
  
+    fun startEdit() {
+        _editContent.value = _item.value?.content ?: ""
+        _isEditing.value = true
+    }
+
+    fun cancelEdit() {
+        _isEditing.value = false
+    }
+
+    fun updateEditContent(text: String) {
+        _editContent.value = text
+    }
+
+    fun saveEdit() {
+        val currentItem = _item.value ?: return
+        viewModelScope.launch {
+            clipItemRepository.update(currentItem.copy(
+                content = _editContent.value,
+                updatedAt = System.currentTimeMillis()
+            ))
+            _isEditing.value = false
+        }
+    }
+
     fun deleteItem() {
+
         viewModelScope.launch {
             _item.value?.let { clipItemRepository.delete(it) }
         }

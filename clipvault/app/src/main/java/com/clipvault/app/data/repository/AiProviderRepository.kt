@@ -1,6 +1,7 @@
 package com.clipvault.app.data.repository
 
 import android.content.Context
+import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -78,6 +79,7 @@ class AiProviderRepository @Inject constructor(
      * Get API Key from DataStore, decrypted.
      */
     suspend fun getApiKey(providerId: Long): String {
+        Log.d("AiProviderRepo", "getApiKey: start")
         return try {
             val key = stringPreferencesKey("api_key_$providerId")
             val prefs = withTimeoutOrNull(3000) {
@@ -92,9 +94,11 @@ class AiProviderRepository @Inject constructor(
                     .first()
             } ?: return ""
             val encrypted = prefs[key] ?: return ""
-            cryptoManager.decrypt(encrypted)
+            val result = cryptoManager.decrypt(encrypted)
+            Log.d("AiProviderRepo", "getApiKey: success key=${result.take(4)}***")
+            result
         } catch (e: Exception) {
-            android.util.Log.e("AiProviderRepository", "Failed to read API key", e)
+            Log.e("AiProviderRepo", "getApiKey: error", e)
             ""
         }
     }

@@ -355,7 +355,7 @@ private fun ClipCard(
                 containerColor = if (isSelected)
                     MaterialTheme.colorScheme.primaryContainer
                 else
-                    MaterialTheme.colorScheme.surfaceContainerLow
+                    MaterialTheme.colorScheme.surfaceContainer
             ),
             shape = BentoAsymmetricCardShape
         ) {

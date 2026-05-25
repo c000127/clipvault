@@ -2,6 +2,7 @@ package com.clipvault.app.ui.settings
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
@@ -53,6 +54,11 @@ class SettingsViewModel @Inject constructor(
 
     private val gson = Gson()
 
+    init {
+        Log.d("SettingsVM", "init: start")
+        Log.d("SettingsVM", "init: themeMode subscribed")
+    }
+
     val themeMode: StateFlow<ThemeMode> = try {
         themePreferences.themeMode
             .stateIn(
@@ -80,6 +86,7 @@ class SettingsViewModel @Inject constructor(
     val message: StateFlow<String?> = _message.asStateFlow()
 
     fun exportData(uri: Uri) {
+        Log.d("SettingsVM", "exportData: start")
         viewModelScope.launch {
             _exportState.value = ExportState.Loading
             try {
@@ -103,6 +110,7 @@ class SettingsViewModel @Inject constructor(
                     }
                 }
 
+                Log.d("SettingsVM", "exportData: items=${itemsList.size}, tags=${allTags.size}")
                 val exportData = ExportData(
                     version = 1,
                     exportedAt = java.time.Instant.now().toString(),
@@ -121,6 +129,7 @@ class SettingsViewModel @Inject constructor(
                     }
                 }
 
+                Log.d("SettingsVM", "exportData: done")
                 _exportState.value = ExportState.Success("Exported ${itemsList.size} items, ${allTags.size} tags")
             } catch (e: Exception) {
                 _exportState.value = ExportState.Error("Export failed: ${e.message}")
@@ -129,6 +138,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun importData(uri: Uri, mode: ImportMode) {
+        Log.d("SettingsVM", "importData: start mode=$mode")
         viewModelScope.launch {
             _importState.value = ImportState.Loading
             try {
@@ -142,6 +152,7 @@ class SettingsViewModel @Inject constructor(
                     gson.fromJson(json, ExportData::class.java)
                 }
 
+                Log.d("SettingsVM", "importData: parsed items=${exportData.items.size}")
                 val existingItems = withContext(Dispatchers.IO) {
                     clipItemRepository.getAllFlow().first()
                 }
@@ -158,6 +169,7 @@ class SettingsViewModel @Inject constructor(
                     }
                 }
 
+                Log.d("SettingsVM", "importData: done")
                 _importState.value = ImportState.Success(
                     "Imported ${exportData.items.size} items, ${exportData.tags.size} tags"
                 )

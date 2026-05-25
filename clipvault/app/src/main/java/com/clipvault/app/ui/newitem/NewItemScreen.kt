@@ -31,7 +31,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -52,7 +51,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.clipvault.app.data.local.entity.Tag
  
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -229,17 +227,24 @@ fun NewItemScreen(
 
             var newTagName by remember { mutableStateOf("") }
 
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                allTags.forEach { tag ->
-                    InputChip(
-                        selected = selectedTags.contains(tag.id),
-                        onClick = { viewModel.toggleTag(tag.id) },
-                        label = { Text(tag.name) }
-                    )
-                }
-            }
+            com.clipvault.app.ui.components.TagTreeSelector(
+                allTags = allTags,
+                selectedTagIds = selectedTags.toSet(),
+                tagPaths = remember(allTags) {
+                    val tagMap = allTags.associateBy { it.id }
+                    allTags.associate { tag ->
+                        val path = mutableListOf<String>()
+                        var current: com.clipvault.app.data.local.entity.Tag? = tag
+                        var safety = 50
+                        while (current != null && safety-- > 0) {
+                            path.add(current.name)
+                            current = tagMap[current.parentId]
+                        }
+                        tag.id to path.reversed().joinToString("/")
+                    }
+                },
+                onTagToggle = { tagId, _ -> viewModel.toggleTag(tagId) }
+            )
 
             Spacer(modifier = Modifier.height(8.dp))
 
