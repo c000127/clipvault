@@ -12,13 +12,18 @@ import kotlinx.coroutines.launch
 class ClipVaultApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        // Pre-initialize database asynchronously on a background thread to ensure smooth startup
+        // Build the database instance instantly (non-blocking)
+        val db = AppDatabase.getInstance(this)
+
+        // Pre-initialize database asynchronously on a background thread to ensure smooth startup and non-blocking navigation
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                AppDatabase.getInstance(this@ClipVaultApplication)
-                Log.d("ClipVault", "DB async init OK")
+                Log.d("ClipVault", "Starting DB async pre-warmup...")
+                // Querying the clip item count forces the database to open and execute migrations
+                val count = db.clipItemDao().getCount()
+                Log.d("ClipVault", "DB async pre-warmup OK. Initial clip count: $count")
             } catch (e: Exception) {
-                Log.e("ClipVault", "DB async init FAILED, but data preserved", e)
+                Log.e("ClipVault", "DB async pre-warmup FAILED, but data preserved", e)
                 AppDatabase.migrationFailed = true
             }
         }
