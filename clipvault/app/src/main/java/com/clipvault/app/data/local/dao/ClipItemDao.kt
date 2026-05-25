@@ -112,6 +112,24 @@ interface ClipItemDao {
     """)
     fun getItemsByTagsWithChildren(tagIds: List<Long>): PagingSource<Int, ClipItem>
 
+    @Transaction
+    @Query("""
+        WITH RECURSIVE tag_tree(id, depth) AS (
+            SELECT id, 0 FROM tags WHERE id IN (:tagIds)
+            UNION ALL
+            SELECT t.id, tt.depth + 1
+            FROM tags t INNER JOIN tag_tree tt ON t.parentId = tt.id
+            WHERE tt.depth < 50
+        )
+        SELECT DISTINCT i.* FROM items i
+        LEFT JOIN item_tags it ON i.id = it.itemId
+        LEFT JOIN tags t ON it.tagId = t.id
+        WHERE (it.tagId IN (SELECT id FROM tag_tree))
+          AND (i.content LIKE '%' || :query || '%' OR i.note LIKE '%' || :query || '%' OR t.name LIKE '%' || :query || '%')
+        ORDER BY i.createdAt DESC
+    """)
+    fun getItemsByTagsAndSearchWithChildren(tagIds: List<Long>, query: String): PagingSource<Int, ClipItem>
+
 
     @Query("SELECT COUNT(*) FROM items")
     suspend fun getCount(): Int

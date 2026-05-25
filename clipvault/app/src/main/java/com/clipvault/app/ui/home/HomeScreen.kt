@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
@@ -41,6 +43,7 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoFile
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -97,13 +100,7 @@ fun HomeScreen(
     val selectedTagIds by viewModel.selectedTagIds.collectAsState()
     val allTags by viewModel.allTags.collectAsState()
     var showTagFilter by remember { mutableStateOf(false) }
-    val isSearchActive = searchQuery.isNotBlank()
-
-    val pagingItems = if (isSearchActive) {
-        viewModel.items.collectAsLazyPagingItems()
-    } else {
-        viewModel.filteredItems.collectAsLazyPagingItems()
-    }
+    val pagingItems = viewModel.items.collectAsLazyPagingItems()
 
     val selectedItems = remember { mutableStateListOf<Long>() }
 
@@ -168,6 +165,37 @@ fun HomeScreen(
                 singleLine = true,
                 shape = PillShape
             )
+
+            // Selected tags chips under search bar
+            val selectedTags = remember(allTags, selectedTagIds) {
+                allTags.filter { selectedTagIds.contains(it.id) }
+            }
+            if (selectedTags.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    selectedTags.forEach { tag ->
+                        InputChip(
+                            selected = true,
+                            onClick = { viewModel.toggleTagSelection(tag.id) },
+                            label = { Text(tag.name) },
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove",
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .clickable { viewModel.toggleTagSelection(tag.id) }
+                                )
+                            }
+                        )
+                    }
+                }
+            }
 
             // Staggered grid
             when (val refreshState = pagingItems.loadState.refresh) {

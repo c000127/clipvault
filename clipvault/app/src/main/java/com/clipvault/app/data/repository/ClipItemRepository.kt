@@ -67,6 +67,9 @@ class ClipItemRepository @Inject constructor(
     fun getItemsByTagsWithChildren(tagIds: List<Long>): PagingSource<Int, ClipItem> =
         clipItemDao.getItemsByTagsWithChildren(tagIds)
 
+    fun getItemsByTagsAndSearchWithChildren(tagIds: List<Long>, query: String): PagingSource<Int, ClipItem> =
+        clipItemDao.getItemsByTagsAndSearchWithChildren(tagIds, query)
+
     // Tag 关联操作
     suspend fun addTagToItem(itemId: Long, tagId: Long) {
         itemTagDao.insert(ItemTag(itemId = itemId, tagId = tagId))

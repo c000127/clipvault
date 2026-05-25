@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -41,35 +42,31 @@ class HomeViewModel @Inject constructor(
     private val _allTags = MutableStateFlow<List<Tag>>(emptyList())
     val allTags: StateFlow<List<Tag>> = _allTags.asStateFlow()
 
-    val items: Flow<PagingData<ClipItem>> = _searchQuery
+    val items: Flow<PagingData<ClipItem>> = combine(_searchQuery, _selectedTagIds) { query, tagIds ->
+        Pair(query, tagIds)
+    }
         .debounce(300)
         .distinctUntilChanged()
-        .flatMapLatest { query ->
-            if (query.isBlank()) {
+        .flatMapLatest { (query, tagIds) ->
+            if (query.isBlank() && tagIds.isEmpty()) {
                 Pager(
                     config = PagingConfig(pageSize = 20, enablePlaceholders = false),
                     pagingSourceFactory = { clipItemRepository.getAllPaged() }
                 ).flow
-            } else {
+            } else if (query.isBlank() && tagIds.isNotEmpty()) {
+                Pager(
+                    config = PagingConfig(pageSize = 20, enablePlaceholders = false),
+                    pagingSourceFactory = { clipItemRepository.getItemsByTagsWithChildren(tagIds.toList()) }
+                ).flow
+            } else if (query.isNotBlank() && tagIds.isEmpty()) {
                 Pager(
                     config = PagingConfig(pageSize = 20, enablePlaceholders = false),
                     pagingSourceFactory = { clipItemRepository.search(query) }
                 ).flow
-            }
-        }
-        .cachedIn(viewModelScope)
-
-    val filteredItems: Flow<PagingData<ClipItem>> = _selectedTagIds
-        .flatMapLatest { tagIds ->
-            if (tagIds.isEmpty()) {
-                Pager(
-                    config = PagingConfig(pageSize = 20, enablePlaceholders = false),
-                    pagingSourceFactory = { clipItemRepository.getAllPaged() }
-                ).flow
             } else {
                 Pager(
                     config = PagingConfig(pageSize = 20, enablePlaceholders = false),
-                    pagingSourceFactory = { clipItemRepository.getItemsByTagsWithChildren(tagIds.toList()) }
+                    pagingSourceFactory = { clipItemRepository.getItemsByTagsAndSearchWithChildren(tagIds.toList(), query) }
                 ).flow
             }
         }
