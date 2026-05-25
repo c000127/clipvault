@@ -1,5 +1,7 @@
 package com.clipvault.app.data.repository
 
+import com.clipvault.app.data.local.AppDatabase
+import androidx.room.withTransaction
 import com.clipvault.app.data.local.dao.ItemTagDao
 import com.clipvault.app.data.local.dao.TagDao
 import com.clipvault.app.data.local.entity.Tag
@@ -9,6 +11,7 @@ import javax.inject.Singleton
 
 @Singleton
 class TagRepository @Inject constructor(
+    private val database: AppDatabase,
     private val tagDao: TagDao,
     private val itemTagDao: ItemTagDao
 ) {
@@ -71,20 +74,22 @@ class TagRepository @Inject constructor(
 
     // 删除 Tag（应用层事务：子节点上移一层 + 清理关联）
     suspend fun deleteTagWithReparenting(tagId: Long) {
-        val tag = tagDao.getByIdOnce(tagId) ?: return
-        val children = tagDao.getChildrenOnce(tagId)
-        val parentId = tag.parentId
+        database.withTransaction {
+            val tag = tagDao.getByIdOnce(tagId) ?: return@withTransaction
+            val children = tagDao.getChildrenOnce(tagId)
+            val parentId = tag.parentId
 
-        // 将子节点的 parentId 更新为被删节点的 parentId（上移一层）
-        for (child in children) {
-            tagDao.updateParentId(child.id, parentId)
+            // 将子节点的 parentId 更新为被删节点的 parentId（上移一层）
+            for (child in children) {
+                tagDao.updateParentId(child.id, parentId)
+            }
+
+            // 删除该 Tag 关联的所有 ItemTag 记录
+            itemTagDao.deleteByTagId(tagId)
+
+            // 删除目标 Tag
+            tagDao.deleteById(tagId)
         }
-
-        // 删除该 Tag 关联的所有 ItemTag 记录
-        itemTagDao.deleteByTagId(tagId)
-
-        // 删除目标 Tag
-        tagDao.deleteById(tagId)
     }
 
     suspend fun getItemCountForTag(tagId: Long): Int = itemTagDao.getItemCountForTag(tagId)

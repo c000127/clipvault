@@ -35,8 +35,8 @@ class HomeViewModel @Inject constructor(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _selectedTagId = MutableStateFlow<Long?>(null)
-    val selectedTagId: StateFlow<Long?> = _selectedTagId.asStateFlow()
+    private val _selectedTagIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedTagIds: StateFlow<Set<Long>> = _selectedTagIds.asStateFlow()
 
     private val _allTags = MutableStateFlow<List<Tag>>(emptyList())
     val allTags: StateFlow<List<Tag>> = _allTags.asStateFlow()
@@ -59,9 +59,9 @@ class HomeViewModel @Inject constructor(
         }
         .cachedIn(viewModelScope)
 
-    val filteredItems: Flow<PagingData<ClipItem>> = _selectedTagId
-        .flatMapLatest { tagId ->
-            if (tagId == null) {
+    val filteredItems: Flow<PagingData<ClipItem>> = _selectedTagIds
+        .flatMapLatest { tagIds ->
+            if (tagIds.isEmpty()) {
                 Pager(
                     config = PagingConfig(pageSize = 20, enablePlaceholders = false),
                     pagingSourceFactory = { clipItemRepository.getAllPaged() }
@@ -69,7 +69,7 @@ class HomeViewModel @Inject constructor(
             } else {
                 Pager(
                     config = PagingConfig(pageSize = 20, enablePlaceholders = false),
-                    pagingSourceFactory = { clipItemRepository.getItemsByTagWithChildren(tagId) }
+                    pagingSourceFactory = { clipItemRepository.getItemsByTagsWithChildren(tagIds.toList()) }
                 ).flow
             }
         }
@@ -93,8 +93,16 @@ class HomeViewModel @Inject constructor(
         _searchQuery.value = query
     }
 
-    fun onTagSelected(tagId: Long?) {
-        _selectedTagId.value = tagId
+    fun toggleTagSelection(tagId: Long) {
+        _selectedTagIds.value = if (_selectedTagIds.value.contains(tagId)) {
+            _selectedTagIds.value - tagId
+        } else {
+            _selectedTagIds.value + tagId
+        }
+    }
+
+    fun clearTagSelection() {
+        _selectedTagIds.value = emptySet()
     }
 
     fun deleteItems(ids: List<Long>) {

@@ -67,38 +67,51 @@ interface ClipItemDao {
     // 按 Tag 过滤（使用 CTE 递归获取所有子节点下的收藏）
     @Transaction
     @Query("""
+        WITH RECURSIVE tag_tree(id, depth) AS (
+            SELECT :tagId, 0
+            UNION ALL
+            SELECT t.id, tt.depth + 1
+            FROM tags t INNER JOIN tag_tree tt ON t.parentId = tt.id
+            WHERE tt.depth < 50
+        )
         SELECT DISTINCT i.* FROM items i
         INNER JOIN item_tags it ON i.id = it.itemId
-        WHERE it.tagId IN (
-            WITH RECURSIVE tag_tree(id, depth) AS (
-                SELECT :tagId, 0
-                UNION ALL
-                SELECT t.id, tt.depth + 1
-                FROM tags t INNER JOIN tag_tree tt ON t.parentId = tt.id
-                WHERE tt.depth < 50
-            )
-            SELECT id FROM tag_tree
-        )
+        WHERE it.tagId IN (SELECT id FROM tag_tree)
         ORDER BY i.createdAt DESC
     """)
     fun getItemsByTagWithChildren(tagId: Long): PagingSource<Int, ClipItem>
 
     @Query("""
+        WITH RECURSIVE tag_tree(id, depth) AS (
+            SELECT :tagId, 0
+            UNION ALL
+            SELECT t.id, tt.depth + 1
+            FROM tags t INNER JOIN tag_tree tt ON t.parentId = tt.id
+            WHERE tt.depth < 50
+        )
         SELECT DISTINCT i.* FROM items i
         INNER JOIN item_tags it ON i.id = it.itemId
-        WHERE it.tagId IN (
-            WITH RECURSIVE tag_tree(id, depth) AS (
-                SELECT :tagId, 0
-                UNION ALL
-                SELECT t.id, tt.depth + 1
-                FROM tags t INNER JOIN tag_tree tt ON t.parentId = tt.id
-                WHERE tt.depth < 50
-            )
-            SELECT id FROM tag_tree
-        )
+        WHERE it.tagId IN (SELECT id FROM tag_tree)
         ORDER BY i.createdAt DESC
     """)
     fun getItemsByTagWithChildrenFlow(tagId: Long): Flow<List<ClipItem>>
+
+    @Transaction
+    @Query("""
+        WITH RECURSIVE tag_tree(id, depth) AS (
+            SELECT id, 0 FROM tags WHERE id IN (:tagIds)
+            UNION ALL
+            SELECT t.id, tt.depth + 1
+            FROM tags t INNER JOIN tag_tree tt ON t.parentId = tt.id
+            WHERE tt.depth < 50
+        )
+        SELECT DISTINCT i.* FROM items i
+        INNER JOIN item_tags it ON i.id = it.itemId
+        WHERE it.tagId IN (SELECT id FROM tag_tree)
+        ORDER BY i.createdAt DESC
+    """)
+    fun getItemsByTagsWithChildren(tagIds: List<Long>): PagingSource<Int, ClipItem>
+
 
     @Query("SELECT COUNT(*) FROM items")
     suspend fun getCount(): Int

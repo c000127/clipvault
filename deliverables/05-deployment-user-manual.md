@@ -94,23 +94,21 @@ adb uninstall com.clipvault.app
 | INTERNET | AI API 调用 | 否 |
 | ACCESS_NETWORK_STATE | 网络状态检测 | 否 |
 
-### 2.2 运行时权限流程
+### 2.2 运行时权限与文件流式复制流程
 
 ```
-用户从外部分享图片/视频到 ClipVault
+用户从外部分享内容 (ACTION_SEND / Content URI) 到 ClipVault
     ↓
 NewItemActivity.onCreate()
     ↓
-检查 mimeType → 图片/视频/音频类型
+1. 立即获取 Content URI 并执行流式复制 (viewModel.copyUriAndSetType)
+   使用 getContentResolver().openInputStream(uri) 复制到私有目录
+   (无需等待存储权限审批，直接利用 Intent 附带的临时读取权限)
     ↓
-hasMediaPermission(mimeType)?
-    ├── 是 → 直接复制文件
-    └── 否 → requestMediaPermission()
-                ↓
-         ActivityResultContracts.RequestMultiplePermissions
-                ├── 授权 → proceedWithCopy()
-                └── 拒绝 → Toast "需要媒体访问权限才能附加文件"
+2. 自行分析 mimeType 并针对 Android 13+ 主动发起媒体权限静默申请
+   (用于支持后续可能的内置相册/文件选择器功能，不阻塞本次分享的复制)
 ```
+
 
 ### 2.3 网络安全配置
 

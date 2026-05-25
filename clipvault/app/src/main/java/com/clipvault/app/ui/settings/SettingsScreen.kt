@@ -1,6 +1,7 @@
 package com.clipvault.app.ui.settings
 
 import android.app.Activity
+import com.clipvault.app.ui.theme.ThemeMode
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -132,6 +133,32 @@ fun SettingsScreen(
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
         ) {
+            val themeMode by viewModel.themeMode.collectAsState()
+            var showThemeDialog by remember { mutableStateOf(false) }
+
+            // Theme Settings
+            SettingsItem(
+                icon = Icons.Default.Palette,
+                title = "Theme Mode",
+                subtitle = when (themeMode) {
+                    ThemeMode.LIGHT -> "Light"
+                    ThemeMode.DARK -> "Dark"
+                    ThemeMode.FOLLOW_SYSTEM -> "Follow System"
+                },
+                onClick = { showThemeDialog = true }
+            )
+
+            if (showThemeDialog) {
+                ThemeSelectionDialog(
+                    currentMode = themeMode,
+                    onModeSelected = { mode ->
+                        viewModel.setThemeMode(mode)
+                        showThemeDialog = false
+                    },
+                    onDismiss = { showThemeDialog = false }
+                )
+            }
+
             // AI Settings
             SettingsItem(
                 icon = Icons.Default.SmartToy,
@@ -298,6 +325,70 @@ private fun ImportModeDialog(
                 Text("Import")
             }
         },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
+private fun ThemeSelectionDialog(
+    currentMode: ThemeMode,
+    onModeSelected: (ThemeMode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select Theme") },
+        text = {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onModeSelected(ThemeMode.FOLLOW_SYSTEM) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = currentMode == ThemeMode.FOLLOW_SYSTEM,
+                        onClick = { onModeSelected(ThemeMode.FOLLOW_SYSTEM) }
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Follow System")
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onModeSelected(ThemeMode.LIGHT) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = currentMode == ThemeMode.LIGHT,
+                        onClick = { onModeSelected(ThemeMode.LIGHT) }
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Light")
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onModeSelected(ThemeMode.DARK) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = currentMode == ThemeMode.DARK,
+                        onClick = { onModeSelected(ThemeMode.DARK) }
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text("Dark")
+                }
+            }
+        },
+        confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
                 Text("Cancel")

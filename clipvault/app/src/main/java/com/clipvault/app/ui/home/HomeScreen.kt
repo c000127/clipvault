@@ -1,7 +1,18 @@
 package com.clipvault.app.ui.home
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
+import com.clipvault.app.ui.theme.PillShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,9 +25,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridScope
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridItemScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AudioFile
@@ -66,10 +80,13 @@ import java.util.Locale
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class
+    ExperimentalLayoutApi::class,
+    ExperimentalSharedTransitionApi::class
 )
 @Composable
 fun HomeScreen(
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onItemClick: (Long) -> Unit,
     onNewItem: () -> Unit,
     onTagManager: () -> Unit = {},
@@ -77,7 +94,7 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val searchQuery by viewModel.searchQuery.collectAsState()
-    val selectedTagId by viewModel.selectedTagId.collectAsState()
+    val selectedTagIds by viewModel.selectedTagIds.collectAsState()
     val allTags by viewModel.allTags.collectAsState()
     var showTagFilter by remember { mutableStateOf(false) }
     val isSearchActive = searchQuery.isNotBlank()
@@ -93,10 +110,12 @@ fun HomeScreen(
     if (showTagFilter) {
         TagFilterSheet(
             tags = allTags,
-            selectedTagId = selectedTagId,
-            onTagSelected = { tagId ->
-                viewModel.onTagSelected(tagId)
-                showTagFilter = false
+            selectedTagIds = selectedTagIds,
+            onTagToggle = { tagId ->
+                viewModel.toggleTagSelection(tagId)
+            },
+            onClearFilter = {
+                viewModel.clearTagSelection()
             },
             onDismiss = { showTagFilter = false }
         )
@@ -108,7 +127,11 @@ fun HomeScreen(
                 title = { Text("ClipVault") },
                 actions = {
                     IconButton(onClick = { showTagFilter = true }) {
-                        Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                        Icon(
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = "Filter",
+                            tint = if (selectedTagIds.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
                     }
                     IconButton(onClick = onTagManager) {
                         Icon(Icons.Default.Label, contentDescription = "Tags")
@@ -120,7 +143,10 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onNewItem) {
+            FloatingActionButton(
+                onClick = onNewItem,
+                shape = CircleShape // pill shape for FAB
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "New")
             }
         }
@@ -130,7 +156,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Search bar
+            // Search bar (pill shape)
             TextField(
                 value = searchQuery,
                 onValueChange = { viewModel.onSearchQueryChange(it) },
@@ -140,7 +166,7 @@ fun HomeScreen(
                 placeholder = { Text("Search clips...") },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 singleLine = true,
-                shape = MaterialTheme.shapes.extraLarge
+                shape = PillShape
             )
 
             // Staggered grid
@@ -174,25 +200,27 @@ fun HomeScreen(
                             columns = StaggeredGridCells.Fixed(2),
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalItemSpacing = 8.dp
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalItemSpacing = 12.dp
                         ) {
                             pagingItems(
                                 items = pagingItems,
                                 key = { it.id }
-                            ) { item ->
-                                item?.let {
+                            ) { clipItem ->
+                                clipItem?.let { item ->
                                     ClipCard(
-                                        item = it,
-                                        onClick = { onItemClick(it.id) },
+                                        item = item,
+                                        sharedTransitionScope = sharedTransitionScope,
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        onClick = { onItemClick(item.id) },
                                         onLongClick = {
-                                            if (selectedItems.contains(it.id)) {
-                                                selectedItems.remove(it.id)
+                                            if (selectedItems.contains(item.id)) {
+                                                selectedItems.remove(item.id)
                                             } else {
-                                                selectedItems.add(it.id)
+                                                selectedItems.add(item.id)
                                             }
                                         },
-                                        isSelected = selectedItems.contains(it.id)
+                                        isSelected = selectedItems.contains(item.id)
                                     )
                                 }
                             }
@@ -218,100 +246,149 @@ fun HomeScreen(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun ClipCard(
     item: ClipItem,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     isSelected: Boolean
 ) {
     val dateFormat = remember { SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surfaceContainerLow
+    var isPressed by remember { mutableStateOf(false) }
+    
+    // spring scale feedback on touch/click
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
         ),
-        shape = MaterialTheme.shapes.medium
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            // Content preview based on type
-            when (item.type) {
-                "image" -> {
-                    if (item.thumbnailPath.isNotBlank()) {
-                        AsyncImage(
-                            model = item.thumbnailPath,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(MaterialTheme.shapes.small),
-                            contentScale = ContentScale.Crop
+        label = "scale"
+    )
+
+    with(sharedTransitionScope) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .sharedElement(
+                    sharedContentState = rememberSharedContentState(key = "clip_${item.id}"),
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    boundsTransform = { _, _ ->
+                        spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessLow
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                )
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .pointerInput(item.id) {
+                    detectTapGestures(
+                        onPress = {
+                            isPressed = true
+                            tryAwaitRelease()
+                            isPressed = false
+                        },
+                        onTap = { onClick() },
+                        onLongPress = { onLongClick() }
+                    )
+                },
+            colors = CardDefaults.cardColors(
+                containerColor = if (isSelected)
+                    MaterialTheme.colorScheme.primaryContainer
+                else
+                    MaterialTheme.colorScheme.surfaceContainerLow
+            ),
+            shape = BentoAsymmetricCardShape
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                // Content preview based on type with Bento-like varying aspect ratios
+                when (item.type) {
+                    "image" -> {
+                        if (item.thumbnailPath.isNotBlank()) {
+                            AsyncImage(
+                                model = item.thumbnailPath,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(if (item.id % 2L == 0L) 1.2f else 0.8f) // non-symmetric bento grid aspect ratio
+                                    .clip(MaterialTheme.shapes.medium),
+                                contentScale = ContentScale.Crop
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                    "link" -> {
+                        Icon(
+                            imageVector = Icons.Default.Link,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.sharedElement(
+                                sharedContentState = rememberSharedContentState(key = "icon_${item.id}"),
+                                animatedVisibilityScope = animatedVisibilityScope
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                    "media" -> {
+                        val icon = if (item.content.endsWith(".mp4") || item.content.endsWith(".mkv")) {
+                            Icons.Default.VideoFile
+                        } else {
+                            Icons.Default.AudioFile
+                        }
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.sharedElement(
+                                sharedContentState = rememberSharedContentState(key = "icon_${item.id}"),
+                                animatedVisibilityScope = animatedVisibilityScope
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 }
-                "link" -> {
-                    Icon(
-                        imageVector = Icons.Default.Link,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-                "media" -> {
-                    val icon = if (item.content.endsWith(".mp4") || item.content.endsWith(".mkv")) {
-                        Icons.Default.VideoFile
-                    } else {
-                        Icons.Default.AudioFile
-                    }
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
-            }
 
-            // Text content
-            if (item.type == "text" || item.note.isNotBlank()) {
+                // Text content
+                if (item.type == "text" || item.note.isNotBlank()) {
+                    Text(
+                        text = item.content.take(100).let { if (it.length == 100) "$it..." else it },
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = if (item.id % 2L == 0L) 6 else 4, // Bento-like staggered heights
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.sharedElement(
+                            sharedContentState = rememberSharedContentState(key = "text_${item.id}"),
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
+                    )
+                }
+
+                // Note preview
+                if (item.note.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = item.note.take(50).let { if (it.length == 50) "$it..." else it },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Timestamp
                 Text(
-                    text = item.content.take(100).let { if (it.length == 100) "$it..." else it },
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
+                    text = dateFormat.format(Date(item.createdAt)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-
-            // Note preview
-            if (item.note.isNotBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = item.note.take(50).let { if (it.length == 50) "$it..." else it },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Timestamp
-            Text(
-                text = dateFormat.format(Date(item.createdAt)),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

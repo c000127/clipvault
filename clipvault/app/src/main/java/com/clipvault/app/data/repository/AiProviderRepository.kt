@@ -59,10 +59,14 @@ class AiProviderRepository @Inject constructor(
      * Value: AES-GCM encrypted, Base64 encoded
      */
     suspend fun saveApiKey(providerId: Long, apiKey: String) {
-        val key = stringPreferencesKey("api_key_$providerId")
-        val encrypted = cryptoManager.encrypt(apiKey)
-        context.apiKeyDataStore.edit { prefs ->
-            prefs[key] = encrypted
+        try {
+            val key = stringPreferencesKey("api_key_$providerId")
+            val encrypted = cryptoManager.encrypt(apiKey)
+            context.apiKeyDataStore.edit { prefs ->
+                prefs[key] = encrypted
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AiProviderRepository", "Failed to save API key", e)
         }
     }
 
@@ -70,19 +74,28 @@ class AiProviderRepository @Inject constructor(
      * Get API Key from DataStore, decrypted.
      */
     suspend fun getApiKey(providerId: Long): String {
-        val key = stringPreferencesKey("api_key_$providerId")
-        val prefs = context.apiKeyDataStore.data.first()
-        val encrypted = prefs[key] ?: return ""
-        return cryptoManager.decrypt(encrypted)
+        return try {
+            val key = stringPreferencesKey("api_key_$providerId")
+            val prefs = context.apiKeyDataStore.data.first()
+            val encrypted = prefs[key] ?: return ""
+            cryptoManager.decrypt(encrypted)
+        } catch (e: Exception) {
+            android.util.Log.e("AiProviderRepository", "Failed to read API key", e)
+            ""
+        }
     }
 
     /**
      * Delete API Key from DataStore.
      */
     suspend fun deleteApiKey(providerId: Long) {
-        val key = stringPreferencesKey("api_key_$providerId")
-        context.apiKeyDataStore.edit { prefs ->
-            prefs.remove(key)
+        try {
+            val key = stringPreferencesKey("api_key_$providerId")
+            context.apiKeyDataStore.edit { prefs ->
+                prefs.remove(key)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("AiProviderRepository", "Failed to delete API key", e)
         }
     }
 

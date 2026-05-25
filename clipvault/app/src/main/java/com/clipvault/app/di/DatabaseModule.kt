@@ -18,19 +18,40 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
 
+    private val dbLock = Any()
+    @Volatile
+    private var dbInstance: AppDatabase? = null
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase {
-        return Room.databaseBuilder(
-            context,
-            AppDatabase::class.java,
-            "clipvault.db"
-        )
-            // Use destructive migration as safety net for schema changes.
-            // This preserves data on same schema version and only triggers
-            // on actual version bumps. Prevents white screen from schema mismatch.
-            .fallbackToDestructiveMigration(dropAllTables = false)
-            .build()
+        return dbInstance ?: synchronized(dbLock) {
+            dbInstance ?: try {
+                Room.databaseBuilder(
+                    context,
+                    AppDatabase::class.java,
+                    "clipvault.db"
+                )
+                // Remove fallbackToDestructiveMigration to prevent user data erasure.
+                // Room will throw an exception on schema mismatch, allowing our try-catch to catch it
+                // and fallback to in-memory, preserving the original database file.
+                .build().also {
+                    dbInstance = it
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("DatabaseModule", "Failed to open or initialize clipvault.db, falling back to in-memory database", e)
+                try {
+                    Room.inMemoryDatabaseBuilder(
+                        context,
+                        AppDatabase::class.java
+                    ).build().also {
+                        dbInstance = it
+                    }
+                } catch (ex: Exception) {
+                    throw RuntimeException("Fatal: Failed to initialize even in-memory database", ex)
+                }
+            }
+        }
     }
 
     @Provides

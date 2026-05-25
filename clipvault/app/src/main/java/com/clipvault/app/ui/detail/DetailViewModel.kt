@@ -8,10 +8,12 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import com.clipvault.app.data.local.entity.ClipItem
+import com.clipvault.app.data.local.AppDatabase
 import com.clipvault.app.data.local.entity.Tag
 import com.clipvault.app.data.repository.ClipItemRepository
 import com.clipvault.app.data.repository.TagRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import androidx.room.withTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,12 +34,22 @@ sealed interface FetchState {
     data class Error(val message: String) : FetchState
 }
 
+sealed interface AiState {
+    data object Idle : AiState
+    data object Loading : AiState
+    data class Success(val summary: String, val suggestedTags: List<String>) : AiState
+    data class Error(val message: String) : AiState
+}
+
 @HiltViewModel
 class DetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     @ApplicationContext private val context: Context,
+    private val database: AppDatabase,
     private val clipItemRepository: ClipItemRepository,
-    private val tagRepository: TagRepository
+    private val tagRepository: TagRepository,
+    private val aiProviderRepository: com.clipvault.app.data.repository.AiProviderRepository,
+    private val aiService: com.clipvault.app.data.remote.AiService
 ) : ViewModel() {
 
     private val itemId: Long = savedStateHandle["id"] ?: 0L
@@ -53,6 +65,9 @@ class DetailViewModel @Inject constructor(
 
     private val _fetchState = MutableStateFlow<FetchState>(FetchState.Idle)
     val fetchState: StateFlow<FetchState> = _fetchState.asStateFlow()
+
+    private val _aiState = MutableStateFlow<AiState>(AiState.Idle)
+    val aiState: StateFlow<AiState> = _aiState.asStateFlow()
 
     val exoPlayer: ExoPlayer = ExoPlayer.Builder(context).build()
 
@@ -181,6 +196,100 @@ class DetailViewModel @Inject constructor(
         viewModelScope.launch {
             _item.value?.let { clipItemRepository.delete(it) }
         }
+    }
+
+    fun analyzeContent() {
+        val currentItem = _item.value ?: return
+        viewModelScope.launch {
+            _aiState.value = AiState.Loading
+            
+            val activeProvider = aiProviderRepository.getActiveProviderWithApiKey()
+            if (activeProvider == null) {
+                _aiState.value = AiState.Error("未配置或未激活 AI 服务，请到设置页面配置")
+                return@launch
+            }
+            if (activeProvider.apiKey.isBlank()) {
+                _aiState.value = AiState.Error("AI 服务密钥 (API Key) 为空")
+                return@launch
+            }
+
+            // Decide content to send
+            val contentToSend = when (currentItem.type) {
+                "link" -> {
+                    if (currentItem.fetchedContent.isNotBlank()) {
+                        "URL: ${currentItem.content}\nFetched content:\n${currentItem.fetchedContent}"
+                    } else {
+                        currentItem.content
+                    }
+                }
+                else -> currentItem.content
+            }
+
+            val result = aiService.analyze(
+                provider = activeProvider,
+                apiKey = activeProvider.apiKey,
+                content = contentToSend,
+                contentType = currentItem.type,
+                imagePath = if (currentItem.type == "image") currentItem.content else null
+            )
+
+            _aiState.value = when (result) {
+                is com.clipvault.app.data.remote.AiResult.Success -> AiState.Success(result.summary, result.suggestedTags)
+                is com.clipvault.app.data.remote.AiResult.Error -> AiState.Error(result.message)
+            }
+        }
+    }
+
+    fun clearAiState() {
+        _aiState.value = AiState.Idle
+    }
+
+    fun applyAiResult(summary: String, selectedTags: List<String>) {
+        val currentItem = _item.value ?: return
+        viewModelScope.launch {
+            // Update note
+            val currentNote = currentItem.note
+            val updatedNote = if (currentNote.isBlank()) summary else "$currentNote\n\nAI Summary:\n$summary"
+
+            database.withTransaction {
+                clipItemRepository.update(currentItem.copy(note = updatedNote, updatedAt = System.currentTimeMillis()))
+
+                // Associate tags
+                val existingTags = tagRepository.getAllTagsOnce().toMutableList()
+                for (tagName in selectedTags) {
+                    val tagId = getOrCreateTagHierarchy(tagName, existingTags)
+                    if (tagId != null) {
+                        clipItemRepository.addTagToItem(itemId, tagId)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun getOrCreateTagHierarchy(tagPath: String, existingTags: MutableList<Tag>): Long? {
+        val segments = tagPath.split('/')
+        var currentParentId: Long? = null
+        var lastTagId: Long? = null
+
+        for (segment in segments) {
+            val name = segment.trim()
+            if (name.isBlank()) continue
+
+            // Find match
+            val match = existingTags.find { it.name.equals(name, ignoreCase = true) && it.parentId == currentParentId }
+            if (match != null) {
+                currentParentId = match.id
+                lastTagId = match.id
+            } else {
+                val newTag = Tag(name = name, parentId = currentParentId)
+                val newId = tagRepository.insert(newTag)
+                val createdTag = newTag.copy(id = newId)
+                existingTags.add(createdTag)
+                currentParentId = newId
+                lastTagId = newId
+            }
+        }
+        return lastTagId
     }
 
     override fun onCleared() {

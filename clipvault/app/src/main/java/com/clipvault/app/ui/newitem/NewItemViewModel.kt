@@ -156,13 +156,7 @@ class NewItemViewModel @Inject constructor(
                     updatedAt = System.currentTimeMillis()
                 )
 
-                val itemId = clipItemRepository.insert(item)
-
-                // Add tags
-                _selectedTags.value.forEach { tagId ->
-                    clipItemRepository.addTagToItem(itemId, tagId)
-                }
-
+                clipItemRepository.insertWithTags(item, _selectedTags.value)
                 _saved.value = true
             } catch (e: Exception) {
                 _errorMessage.value = "Failed to save: ${e.message}"

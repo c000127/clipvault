@@ -10,13 +10,28 @@ import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+import com.clipvault.app.data.local.AppDatabase
+import androidx.room.withTransaction
+
 @Singleton
 class ClipItemRepository @Inject constructor(
+    private val database: AppDatabase,
     private val clipItemDao: ClipItemDao,
     private val itemTagDao: ItemTagDao
 ) {
     // CRUD 操作
+    suspend fun insertWithTags(item: ClipItem, tagIds: List<Long>): Long {
+        return database.withTransaction {
+            val itemId = clipItemDao.insert(item)
+            tagIds.forEach { tagId ->
+                itemTagDao.insert(ItemTag(itemId = itemId, tagId = tagId))
+            }
+            itemId
+        }
+    }
+
     suspend fun insert(item: ClipItem): Long = clipItemDao.insert(item)
+
 
     suspend fun insertAll(items: List<ClipItem>): List<Long> = clipItemDao.insertAll(items)
 
@@ -48,6 +63,9 @@ class ClipItemRepository @Inject constructor(
 
     fun getItemsByTagWithChildrenFlow(tagId: Long): Flow<List<ClipItem>> =
         clipItemDao.getItemsByTagWithChildrenFlow(tagId)
+
+    fun getItemsByTagsWithChildren(tagIds: List<Long>): PagingSource<Int, ClipItem> =
+        clipItemDao.getItemsByTagsWithChildren(tagIds)
 
     // Tag 关联操作
     suspend fun addTagToItem(itemId: Long, tagId: Long) {

@@ -40,18 +40,27 @@ class AiService @Inject constructor() {
      *   - https://api.openai.com/v1/chat/completions
      */
     private fun buildChatUrl(baseUrl: String): String {
-        var url = baseUrl.trimEnd('/')
+        val url = baseUrl.trim().trimEnd('/')
 
-        // If URL already ends with /chat/completions, use as-is
-        if (url.endsWith("/chat/completions")) return url
-
-        // Remove trailing /v1 if present (we'll add it back)
-        if (url.endsWith("/v1")) {
-            url = url.removeSuffix("/v1")
+        return when {
+            url.endsWith("/chat/completions") -> url
+            url.contains("/chat/completions/") -> url
+            url.endsWith("/v1") -> "$url/chat/completions"
+            url.contains("/v1/") -> {
+                val v1Index = url.indexOf("/v1/")
+                val basePart = url.substring(0, v1Index + 3) // e.g. "https://api.openai.com/v1"
+                val remainingPart = url.substring(v1Index + 4).trim('/') // portion after "/v1/"
+                if (remainingPart.contains("chat/completions")) {
+                    url
+                } else if (remainingPart.isEmpty()) {
+                    "$basePart/chat/completions"
+                } else {
+                    "$basePart/$remainingPart/chat/completions"
+                }
+            }
+            url.endsWith("/completions") || url.endsWith("/generate") -> url
+            else -> "$url/v1/chat/completions"
         }
-
-        // Build final URL
-        return "$url/v1/chat/completions"
     }
 
     suspend fun analyze(

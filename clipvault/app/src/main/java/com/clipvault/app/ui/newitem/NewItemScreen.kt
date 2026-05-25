@@ -2,6 +2,9 @@ package com.clipvault.app.ui.newitem
 
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import coil3.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.draw.clip
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,6 +59,7 @@ fun NewItemScreen(
 ) {
     val content by viewModel.content.collectAsState()
     val type by viewModel.type.collectAsState()
+    val filePath by viewModel.filePath.collectAsState()
     val selectedTags by viewModel.selectedTags.collectAsState()
     val allTags by viewModel.allTags.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
@@ -121,7 +125,7 @@ fun NewItemScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // Content input
+            // Content input (16dp rounded corners)
             OutlinedTextField(
                 value = content,
                 onValueChange = { viewModel.setContent(it) },
@@ -129,12 +133,39 @@ fun NewItemScreen(
                     .fillMaxWidth()
                     .height(200.dp),
                 label = { Text("Content") },
-                placeholder = { Text("Enter text, URL, or paste content...") }
+                placeholder = { Text("Enter text, URL, or paste content...") },
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
             )
+
+            if (filePath.isNotBlank()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Preview",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                if (type == "image") {
+                    AsyncImage(
+                        model = filePath,
+                        contentDescription = "Selected image preview",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Text(
+                        text = "Attached file: $filePath",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Import buttons
+            // Import buttons (Pill shape)
             Text(
                 text = "Import from",
                 style = MaterialTheme.typography.titleSmall,
@@ -144,11 +175,17 @@ fun NewItemScreen(
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(onClick = { imagePickerLauncher.launch("image/*") }) {
+                OutlinedButton(
+                    onClick = { imagePickerLauncher.launch("image/*") },
+                    shape = com.clipvault.app.ui.theme.PillShape
+                ) {
                     Icon(Icons.Default.Image, contentDescription = null)
                     Text("Gallery")
                 }
-                OutlinedButton(onClick = { filePickerLauncher.launch("*/*") }) {
+                OutlinedButton(
+                    onClick = { filePickerLauncher.launch("*/*") },
+                    shape = com.clipvault.app.ui.theme.PillShape
+                ) {
                     Icon(Icons.Default.CameraAlt, contentDescription = null)
                     Text("File")
                 }
@@ -179,13 +216,14 @@ fun NewItemScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // New tag input
+            // New tag input (16dp rounded corners)
             OutlinedTextField(
                 value = newTagName,
                 onValueChange = { newTagName = it },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("New tag name") },
                 singleLine = true,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
                 trailingIcon = {
                     if (newTagName.isNotBlank()) {
                         IconButton(onClick = {
@@ -200,11 +238,12 @@ fun NewItemScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Save button
+            // Save button (Pill shape)
             Button(
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !isSaving && content.isNotBlank()
+                enabled = !isSaving && (content.isNotBlank() || filePath.isNotBlank()),
+                shape = com.clipvault.app.ui.theme.PillShape
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(

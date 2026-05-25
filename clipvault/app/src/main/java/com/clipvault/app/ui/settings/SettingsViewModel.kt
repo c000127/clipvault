@@ -4,20 +4,26 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
+import com.clipvault.app.data.local.AppDatabase
 import com.clipvault.app.data.local.entity.ClipItem
 import com.clipvault.app.data.local.entity.ItemTag
 import com.clipvault.app.data.local.entity.Tag
 import com.clipvault.app.data.repository.AiProviderRepository
 import com.clipvault.app.data.repository.ClipItemRepository
 import com.clipvault.app.data.repository.TagRepository
+import com.clipvault.app.ui.theme.ThemeMode
+import com.clipvault.app.ui.theme.ThemePreferences
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -38,12 +44,27 @@ sealed interface ImportMode {
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val database: AppDatabase,
     private val clipItemRepository: ClipItemRepository,
     private val tagRepository: TagRepository,
-    private val aiProviderRepository: AiProviderRepository
+    private val aiProviderRepository: AiProviderRepository,
+    private val themePreferences: ThemePreferences
 ) : ViewModel() {
 
     private val gson = Gson()
+
+    val themeMode: StateFlow<ThemeMode> = themePreferences.themeMode
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = ThemeMode.FOLLOW_SYSTEM
+        )
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch {
+            themePreferences.setThemeMode(mode)
+        }
+    }
 
     private val _exportState = MutableStateFlow<ExportState>(ExportState.Idle)
     val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
@@ -58,14 +79,21 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _exportState.value = ExportState.Loading
             try {
-                val itemsList = clipItemRepository.getAllFlow().first()
+                val itemsList = withContext(Dispatchers.IO) {
+                    clipItemRepository.getAllFlow().first()
+                }
 
-                val allTags = tagRepository.getAllTagsOnce()
+                val allTags = withContext(Dispatchers.IO) {
+                    tagRepository.getAllTagsOnce()
+                }
+
                 val allItemTags = mutableListOf<ItemTag>()
-                for (item in itemsList) {
-                    val tags = clipItemRepository.getTagsForItemOnce(item.id)
-                    tags.forEach { tag ->
-                        allItemTags.add(ItemTag(itemId = item.id, tagId = tag.id))
+                withContext(Dispatchers.IO) {
+                    for (item in itemsList) {
+                        val tags = clipItemRepository.getTagsForItemOnce(item.id)
+                        tags.forEach { tag ->
+                            allItemTags.add(ItemTag(itemId = item.id, tagId = tag.id))
+                        }
                     }
                 }
 
@@ -77,7 +105,9 @@ class SettingsViewModel @Inject constructor(
                     itemTags = allItemTags
                 )
 
-                val json = gson.toJson(exportData)
+                val json = withContext(Dispatchers.Default) {
+                    gson.toJson(exportData)
+                }
 
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { output ->
@@ -102,11 +132,24 @@ class SettingsViewModel @Inject constructor(
                     } ?: throw IllegalStateException("Cannot read file")
                 }
 
-                val exportData = gson.fromJson(json, ExportData::class.java)
+                val exportData = withContext(Dispatchers.Default) {
+                    gson.fromJson(json, ExportData::class.java)
+                }
 
-                when (mode) {
-                    is ImportMode.Overwrite -> importOverwrite(exportData)
-                    is ImportMode.Merge -> importMerge(exportData)
+                val existingItems = withContext(Dispatchers.IO) {
+                    clipItemRepository.getAllFlow().first()
+                }
+                val existingTags = withContext(Dispatchers.IO) {
+                    tagRepository.getAllTagsOnce()
+                }
+
+                withContext(Dispatchers.IO) {
+                    database.withTransaction {
+                        when (mode) {
+                            is ImportMode.Overwrite -> importOverwrite(exportData, existingItems, existingTags)
+                            is ImportMode.Merge -> importMerge(exportData)
+                        }
+                    }
                 }
 
                 _importState.value = ImportState.Success(
@@ -118,12 +161,9 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    private suspend fun importOverwrite(data: ExportData) {
+    private suspend fun importOverwrite(data: ExportData, existingItems: List<ClipItem>, existingTags: List<Tag>) {
         // Clear all existing data
-        val existingItems = clipItemRepository.getAllFlow().first()
         clipItemRepository.deleteByIds(existingItems.map { it.id })
-
-        val existingTags = tagRepository.getAllTagsOnce()
         existingTags.forEach { tagRepository.delete(it) }
 
         // Insert new data with original IDs preserved

@@ -77,8 +77,21 @@ class CryptoManager @Inject constructor() {
     }
 
     private fun getKey(): SecretKey {
+        try {
+            if (!keyStore.containsAlias(KEY_ALIAS)) {
+                generateKey()
+            }
+            val entry = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
+            if (entry != null) {
+                return entry.secretKey
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error getting key from Keystore, attempting regeneration", e)
+        }
+        // If entry is null or exception occurred, regenerate key and try one more time
+        generateKey()
         val entry = keyStore.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry
-            ?: throw IllegalStateException("Key not found in Keystore")
+            ?: throw IllegalStateException("Key not found in Keystore after regeneration")
         return entry.secretKey
     }
 
@@ -90,22 +103,47 @@ class CryptoManager @Inject constructor() {
         if (plaintext.isBlank()) return ""
 
         return try {
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.ENCRYPT_MODE, getKey())
-
-            val iv = cipher.iv
-            val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
-
-            // Combine IV + Ciphertext
-            val combined = ByteArray(iv.size + ciphertext.size)
-            System.arraycopy(iv, 0, combined, 0, iv.size)
-            System.arraycopy(ciphertext, 0, combined, iv.size, ciphertext.size)
-
-            Base64.encodeToString(combined, Base64.NO_WRAP)
+            encryptInternal(plaintext)
+        } catch (e: KeyPermanentlyInvalidatedException) {
+            Log.w(TAG, "Key permanently invalidated during encryption, regenerating", e)
+            handleKeyLoss()
+            try {
+                encryptInternal(plaintext)
+            } catch (ex: Exception) {
+                Log.e(TAG, "Encryption failed after key regeneration", ex)
+                ""
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "Encryption failed", e)
-            ""
+            if (e.message?.contains("Key not found") == true ||
+                e.message?.contains("unrecoverable") == true) {
+                Log.w(TAG, "Key lost during encryption, regenerating", e)
+                handleKeyLoss()
+                try {
+                    encryptInternal(plaintext)
+                } catch (ex: Exception) {
+                    Log.e(TAG, "Encryption failed after key regeneration", ex)
+                    ""
+                }
+            } else {
+                Log.e(TAG, "Encryption failed with unexpected error", e)
+                ""
+            }
         }
+    }
+
+    private fun encryptInternal(plaintext: String): String {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, getKey())
+
+        val iv = cipher.iv
+        val ciphertext = cipher.doFinal(plaintext.toByteArray(Charsets.UTF_8))
+
+        // Combine IV + Ciphertext
+        val combined = ByteArray(iv.size + ciphertext.size)
+        System.arraycopy(iv, 0, combined, 0, iv.size)
+        System.arraycopy(ciphertext, 0, combined, iv.size, ciphertext.size)
+
+        return Base64.encodeToString(combined, Base64.NO_WRAP)
     }
 
     /**
@@ -113,10 +151,17 @@ class CryptoManager @Inject constructor() {
      * Handles all crypto exceptions gracefully — never crashes, returns "" on failure.
      */
     fun decrypt(encryptedBase64: String): String {
-        if (encryptedBase64.isBlank()) return ""
+        val trimmed = encryptedBase64.trim()
+        if (trimmed.isBlank()) return ""
 
         return try {
-            val combined = Base64.decode(encryptedBase64, Base64.NO_WRAP)
+            // Try Base64.NO_WRAP first, fall back to DEFAULT if it fails
+            val combined = try {
+                Base64.decode(trimmed, Base64.NO_WRAP)
+            } catch (e: IllegalArgumentException) {
+                Base64.decode(trimmed, Base64.DEFAULT)
+            }
+
             if (combined.size <= IV_SIZE) {
                 Log.e(TAG, "Encrypted data too short: ${combined.size} bytes")
                 return ""
