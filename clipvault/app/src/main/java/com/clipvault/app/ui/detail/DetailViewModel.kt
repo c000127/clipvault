@@ -93,13 +93,13 @@ class DetailViewModel @Inject constructor(
      * Previously used nested collect which blocked the outer Flow.
      */
     private fun loadItem() {
-        // Load item separately
         viewModelScope.launch {
-            clipItemRepository.getById(itemId)
-                .catch { /* swallow DB errors to prevent crash */ }
-                .collectLatest { clipItem ->
-                    _item.value = clipItem
-                }
+            try {
+                val item = clipItemRepository.getByIdWithAttachments(itemId)
+                _item.value = item
+            } catch (e: Exception) {
+                android.util.Log.e("DetailVM", "loadItem failed", e)
+            }
         }
         // Load tags for this item independently
         viewModelScope.launch {
@@ -179,6 +179,7 @@ class DetailViewModel @Inject constructor(
                 // Save to database
                 _item.value?.let { current ->
                     clipItemRepository.update(current.copy(fetchedContent = content, updatedAt = System.currentTimeMillis()))
+                    loadItem()
                 }
             } catch (e: java.net.SocketTimeoutException) {
                 _fetchState.value = FetchState.Error("页面加载超时")
@@ -231,6 +232,7 @@ class DetailViewModel @Inject constructor(
                 updatedAt = System.currentTimeMillis()
             ))
             _isEditing.value = false
+            loadItem()
         }
     }
 
@@ -312,6 +314,7 @@ class DetailViewModel @Inject constructor(
                     }
                 }
             }
+            loadItem()
         }
     }
  

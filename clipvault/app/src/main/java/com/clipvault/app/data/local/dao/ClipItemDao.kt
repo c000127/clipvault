@@ -32,6 +32,9 @@ interface ClipItemDao {
     @Query("SELECT * FROM items WHERE id = :id")
     fun getById(id: Long): Flow<ClipItem?>
 
+    @Query("SELECT * FROM items WHERE id = :id")
+    suspend fun getByIdOnce(id: Long): ClipItem?
+
     @Query("SELECT * FROM items ORDER BY createdAt DESC")
     fun getAllPaged(): PagingSource<Int, ClipItem>
 

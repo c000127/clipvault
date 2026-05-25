@@ -51,12 +51,21 @@ class NewItemViewModel @Inject constructor(
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
  
     init {
-        viewModelScope.launch {
-            tagRepository.getAllTags()
-                .catch { _allTags.value = emptyList() }
-                .collect {
-                    _allTags.value = it
-                }
+        android.util.Log.d("NewItemVM", "init start: content empty=${_content.value.isEmpty()}, tags empty=${_allTags.value.isEmpty()}")
+        try {
+            viewModelScope.launch {
+                tagRepository.getAllTags()
+                    .catch { e ->
+                        android.util.Log.e("NewItemVM", "load tags failed", e)
+                        _allTags.value = emptyList()
+                    }
+                    .collect {
+                        _allTags.value = it
+                        android.util.Log.d("NewItemVM", "loaded ${it.size} tags")
+                    }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NewItemVM", "init crash", e)
         }
     }
  

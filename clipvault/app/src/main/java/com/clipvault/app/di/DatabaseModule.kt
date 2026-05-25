@@ -34,20 +34,31 @@ object DatabaseModule {
                     "clipvault.db"
                 )
                 .addMigrations(AppDatabase.MIGRATION_1_2)
+                .fallbackToDestructiveMigration(true)  // 迁移失败时重建而非 crash
+                .setQueryCallback({ sql, args ->
+                    android.util.Log.d("AppDB", "SQL: $sql | Args: $args")
+                }, { it.run() })
                 .build().also {
                     dbInstance = it
                 }
             } catch (e: Exception) {
-                android.util.Log.e("DatabaseModule", "Failed to open or initialize clipvault.db, falling back to in-memory database", e)
+                android.util.Log.e("DatabaseModule", "DB init failed, falling back to destructive migration", e)
                 try {
-                    Room.inMemoryDatabaseBuilder(
+                    Room.databaseBuilder(
                         context,
-                        AppDatabase::class.java
-                    ).build().also {
+                        AppDatabase::class.java,
+                        "clipvault.db"
+                    )
+                    .fallbackToDestructiveMigration(true)
+                    .setQueryCallback({ sql, args ->
+                        android.util.Log.d("AppDB", "SQL: $sql | Args: $args")
+                    }, { it.run() })
+                    .build().also {
                         dbInstance = it
                     }
                 } catch (ex: Exception) {
-                    throw RuntimeException("Fatal: Failed to initialize even in-memory database", ex)
+                    android.util.Log.e("DatabaseModule", "Fatal: Failed to initialize even with destructive migration", ex)
+                    throw RuntimeException("Fatal: Failed to initialize database", ex)
                 }
             }
         }

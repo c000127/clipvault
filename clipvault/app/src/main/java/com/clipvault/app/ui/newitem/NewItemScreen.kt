@@ -2,6 +2,7 @@ package com.clipvault.app.ui.newitem
  
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import kotlinx.coroutines.launch
 import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
@@ -68,6 +69,7 @@ fun NewItemScreen(
     val errorMessage by viewModel.errorMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
 
     // Set initial text from intent
     LaunchedEffect(initialText) {
@@ -91,8 +93,16 @@ fun NewItemScreen(
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let {
-            viewModel.copyUriAndSetType(it, "image/jpeg")
+        try {
+            uri?.let {
+                android.util.Log.d("NewItemScreen", "image picked: $it")
+                viewModel.copyUriAndSetType(it, "image/jpeg")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NewItemScreen", "image picker callback failed", e)
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Failed to import image: ${e.message}")
+            }
         }
     }
 
@@ -100,9 +110,17 @@ fun NewItemScreen(
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        uri?.let {
-            val mimeType = context.contentResolver.getType(it)
-            viewModel.copyUriAndSetType(it, mimeType)
+        try {
+            uri?.let {
+                android.util.Log.d("NewItemScreen", "file picked: $it")
+                val mimeType = context.contentResolver.getType(it)
+                viewModel.copyUriAndSetType(it, mimeType)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("NewItemScreen", "file picker callback failed", e)
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar("Failed to import file: ${e.message}")
+            }
         }
     }
 

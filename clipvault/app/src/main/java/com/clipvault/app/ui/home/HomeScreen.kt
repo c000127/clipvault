@@ -155,7 +155,10 @@ fun HomeScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = onNewItem,
+                onClick = {
+                    android.util.Log.d("HomeScreen", "navigate to New")
+                    onNewItem()
+                },
                 shape = CircleShape // pill shape for FAB
             ) {
                 Icon(Icons.Default.Add, contentDescription = "New")

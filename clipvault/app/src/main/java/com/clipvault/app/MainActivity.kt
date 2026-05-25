@@ -65,7 +65,12 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate(Screen.Detail(id))
                                 },
                                 onNewItem = {
-                                    navController.navigate(Screen.New())
+                                    try {
+                                        android.util.Log.d("HomeScreen", "navigating to Screen.New()")
+                                        navController.navigate(Screen.New())
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("HomeScreen", "navigation failed", e)
+                                    }
                                 },
                                 onTagManager = {
                                     navController.navigate(Screen.TagManager)
@@ -85,6 +90,7 @@ class MainActivity : ComponentActivity() {
                         }
 
                         composable<Screen.New> { backStackEntry ->
+                            android.util.Log.d("MainActivity", "navigating to New screen")
                             val route = backStackEntry.toRoute<Screen.New>()
                             NewItemScreen(
                                 onBack = { navController.popBackStack() },

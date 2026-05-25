@@ -50,9 +50,13 @@ class ClipItemRepository @Inject constructor(
 
     // 查询操作
     fun getById(id: Long): Flow<ClipItem?> = clipItemDao.getById(id).map { item ->
-        item?.apply {
-            attachments = contentAttachmentDao.getAttachmentsByItemIdOnce(id)
-        }
+        item?.copy()
+    }
+
+    suspend fun getByIdWithAttachments(id: Long): ClipItem? {
+        val item = clipItemDao.getByIdOnce(id) ?: return null
+        val atts = contentAttachmentDao.getAttachmentsByItemIdOnce(id)
+        return item.apply { attachments = atts }
     }
 
     fun getAllPaged(): PagingSource<Int, ClipItem> = clipItemDao.getAllPaged()
