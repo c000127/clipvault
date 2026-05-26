@@ -175,14 +175,54 @@ fun HomeScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            // Search bar (pill-shaped elevated container, beautifully separated)
+            val dbInitFailed = remember { com.clipvault.app.ClipVaultApplication.dbInitFailed }
+            val dbInitError = remember { com.clipvault.app.ClipVaultApplication.dbInitErrorMessage }
+
+            if (dbInitFailed) {
+                Card(
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Close,
+                            contentDescription = "Warning",
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "数据库异常 (Database Failed)",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "数据已在原始文件中受到保护，未丢失。错误原因：${dbInitError ?: "Unknown database error"}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Search bar (flat container, beautifully integrated)
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                shape = CircleShape,
+                    .padding(vertical = 4.dp), // 移除左右 padding
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp), // 直角，与背景融合
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shadowElevation = 2.dp
+                shadowElevation = 0.dp // 移除阴影
             ) {
                 androidx.compose.material3.OutlinedTextField(
                     value = searchQuery,
@@ -198,8 +238,9 @@ fun HomeScreen(
                         }
                     },
                     singleLine = true,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp), // 直角
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
+                        focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent, // 无边框
                         unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
                         focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
                         unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -383,9 +424,9 @@ private fun ClipCard(
                 containerColor = if (isSelected)
                     MaterialTheme.colorScheme.primaryContainer
                 else
-                    MaterialTheme.colorScheme.surfaceContainerHigh
+                    MaterialTheme.colorScheme.surfaceContainerLow
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
             shape = BentoAsymmetricCardShape
         ) {
             Column(modifier = Modifier.padding(14.dp)) {

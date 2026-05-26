@@ -93,12 +93,31 @@ fun SettingsScreen(
     }
 
     var pendingImportUri by remember { mutableStateOf<Uri?>(null) }
+    var isExporting by remember { mutableStateOf(false) }
+    var isImporting by remember { mutableStateOf(false) }
+
+    // Reset exporting/importing flags on state change
+    LaunchedEffect(exportState) {
+        if (exportState !is ExportState.Loading) {
+            isExporting = false
+        }
+    }
+    LaunchedEffect(importState) {
+        if (importState !is ImportState.Loading) {
+            isImporting = false
+        }
+    }
 
     // Export launcher
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
-        uri?.let { viewModel.exportData(it) }
+        uri?.let {
+            if (!isExporting) {
+                isExporting = true
+                viewModel.exportData(it)
+            }
+        }
     }
 
     // Import launcher
@@ -148,7 +167,10 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            if (com.clipvault.app.data.local.AppDatabase.migrationFailed) {
+            val dbInitFailed = remember { com.clipvault.app.ClipVaultApplication.dbInitFailed }
+            val dbInitError = remember { com.clipvault.app.ClipVaultApplication.dbInitErrorMessage }
+
+            if (dbInitFailed || com.clipvault.app.data.local.AppDatabase.migrationFailed) {
                 Card(
                     colors = androidx.compose.material3.CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
@@ -168,13 +190,13 @@ fun SettingsScreen(
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
-                                text = "Database Migration Failed",
+                                text = "数据库异常 (Database Failed)",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "There was an issue migrating your local database. Pre-existing clips and tags were preserved, but we recommend exporting a backup JSON immediately and reinstalling the app if issues persist.",
+                                text = "数据已在原始文件中受到保护，未丢失。错误原因：${dbInitError ?: "Database migration failure"}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
@@ -187,13 +209,13 @@ fun SettingsScreen(
             var showThemeDialog by remember { mutableStateOf(false) }
 
             // Group 1: Appearance Settings Card
-            ElevatedCard(
+            Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -227,13 +249,13 @@ fun SettingsScreen(
             }
 
             // Group 2: Smart Features Settings Card (AI)
-            ElevatedCard(
+            Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -252,13 +274,13 @@ fun SettingsScreen(
             }
 
             // Group 3: Data Backup Settings Card
-            ElevatedCard(
+            Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -276,8 +298,13 @@ fun SettingsScreen(
                             is ExportState.Error -> "Export failed"
                             else -> "Export clips and tags as JSON"
                         },
-                        onClick = { exportLauncher.launch("clipvault_export.json") },
-                        enabled = exportState !is ExportState.Loading
+                        onClick = {
+                            if (!isExporting) {
+                                isExporting = true
+                                exportLauncher.launch("clipvault_export.json")
+                            }
+                        },
+                        enabled = exportState !is ExportState.Loading && !isExporting
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     SettingsItem(
@@ -296,13 +323,13 @@ fun SettingsScreen(
             }
 
             // Group 4: About Card
-            ElevatedCard(
+            Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
                 Column(
                     modifier = Modifier

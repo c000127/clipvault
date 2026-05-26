@@ -493,15 +493,14 @@ fun DetailScreen(
 
                     imageAttachments.forEach { attachment ->
                         var aspectRatio by remember(attachment.filePath) { mutableStateOf<Float?>(null) }
-                        ElevatedCard(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 6.dp),
-                            shape = MaterialTheme.shapes.large,
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                            ),
-                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .padding(12.dp)
                         ) {
                             val imageModifier = if (aspectRatio != null) {
                                 Modifier
@@ -528,21 +527,25 @@ fun DetailScreen(
                                 contentScale = ContentScale.FillWidth
                             )
                         }
+                        androidx.compose.material3.HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
                     }
 
                     // Card 3b: Other Attachments (media, link, file)
                     if (otherAttachments.isNotEmpty()) {
-                        ElevatedCard(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 6.dp),
-                            shape = MaterialTheme.shapes.large,
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                            ),
-                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                                .background(
+                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .padding(12.dp)
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
+                            Column(modifier = Modifier.padding(4.dp)) {
                                 Text(
                                     text = "Attachments & Links",
                                     style = MaterialTheme.typography.titleMedium,
@@ -621,18 +624,22 @@ fun DetailScreen(
                                 }
                             }
                         }
+                        androidx.compose.material3.HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
                     }
 
-                    // Card 4: AI Analysis Action Card (styled as a primary-tonal container floating card)
-                    ElevatedCard(
+                    // Card 4: AI Analysis Action Card (styled as a primary-tonal container flat Card)
+                    Card(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
+                            .fillMaxWidth(),
                         shape = PillShape,
-                        colors = CardDefaults.elevatedCardColors(
+                        colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer
                         ),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                     ) {
                         Row(
                             modifier = Modifier
@@ -656,16 +663,21 @@ fun DetailScreen(
                         }
                     }
 
-                    // Card 5: Tags & Metadata Section (grouped, elevated container card)
-                    ElevatedCard(
+                    androidx.compose.material3.HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 8.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
+                    // Card 5: Tags & Metadata Section (grouped, flat container Column)
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.elevatedCardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                        ),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .padding(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Row(

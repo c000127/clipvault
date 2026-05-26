@@ -47,7 +47,7 @@ abstract class AppDatabase : RoomDatabase() {
         fun getInstance(context: Context): AppDatabase {
             return dbInstance ?: synchronized(dbLock) {
                 dbInstance ?: try {
-                    androidx.room.Room.databaseBuilder(
+                    val db = androidx.room.Room.databaseBuilder(
                         context.applicationContext,
                         AppDatabase::class.java,
                         "clipvault.db"
@@ -56,13 +56,20 @@ abstract class AppDatabase : RoomDatabase() {
                     .setQueryCallback({ sql, args ->
                         android.util.Log.d("AppDB", "SQL: $sql | Args: $args")
                     }, { it.run() })
-                    .build().also {
-                        dbInstance = it
-                    }
+                    .build()
+
+                    // Verify DB is accessible
+                    db.openHelper.writableDatabase
+
+                    db.also { dbInstance = it }
                 } catch (e: Exception) {
-                    android.util.Log.e("AppDatabase", "AppDatabase builder failed", e)
+                    android.util.Log.e("AppDatabase", "Database init failed", e)
+                    dbInstance = null
                     migrationFailed = true
-                    throw e
+                    throw RuntimeException(
+                        "Database initialization failed. Your data is preserved in the original file. " +
+                        "Please report this issue.", e
+                    )
                 }
             }
         }
