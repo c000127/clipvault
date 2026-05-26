@@ -218,14 +218,10 @@ class DetailViewModel @Inject constructor(
     private val _editAttachments = MutableStateFlow<List<ContentAttachment>>(emptyList())
     val editAttachments: StateFlow<List<ContentAttachment>> = _editAttachments.asStateFlow()
 
-    private val _editSourceApp = MutableStateFlow("")
-    val editSourceApp: StateFlow<String> = _editSourceApp.asStateFlow()
-
     fun startEdit() {
         val item = _item.value ?: return
         _editContent.value = item.content
         _editAttachments.value = item.attachments.toList()
-        _editSourceApp.value = item.sourceApp
         _isEditing.value = true
     }
 
@@ -235,10 +231,6 @@ class DetailViewModel @Inject constructor(
 
     fun updateEditContent(text: String) {
         _editContent.value = text
-    }
-
-    fun updateEditSourceApp(text: String) {
-        _editSourceApp.value = text
     }
 
     fun addAttachmentToEdit(uri: Uri, mimeType: String?) {
@@ -313,7 +305,6 @@ class DetailViewModel @Inject constructor(
             database.withTransaction {
                 clipItemRepository.update(currentItem.copy(
                     content = _editContent.value,
-                    sourceApp = _editSourceApp.value,
                     thumbnailPath = _editAttachments.value.firstOrNull { it.type == "image" }?.filePath
                         ?: "",
                     updatedAt = System.currentTimeMillis()

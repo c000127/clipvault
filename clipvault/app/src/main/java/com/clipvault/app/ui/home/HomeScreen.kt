@@ -1,13 +1,5 @@
 package com.clipvault.app.ui.home
 
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -88,13 +80,10 @@ import java.util.Locale
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class,
-    ExperimentalSharedTransitionApi::class
+    ExperimentalLayoutApi::class
 )
 @Composable
 fun HomeScreen(
-    sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope,
     onItemClick: (Long) -> Unit,
     onNewItem: () -> Unit,
     onTagManager: () -> Unit = {},
@@ -336,8 +325,6 @@ fun HomeScreen(
                                 clipItem?.let { item ->
                                     ClipCard(
                                         item = item,
-                                        sharedTransitionScope = sharedTransitionScope,
-                                        animatedVisibilityScope = animatedVisibilityScope,
                                         onClick = { onItemClick(item.id) },
                                         onLongClick = {
                                             if (selectedItems.contains(item.id)) {
@@ -372,112 +359,93 @@ fun HomeScreen(
     }
 }
  
-@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun ClipCard(
     item: ClipItem,
-    sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     isSelected: Boolean
 ) {
     val dateFormat = remember { SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()) }
-    with(sharedTransitionScope) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .sharedElement(
-                    sharedContentState = rememberSharedContentState(key = "clip_${item.id}"),
-                    animatedVisibilityScope = animatedVisibilityScope,
-                    boundsTransform = { _, _ ->
-                        tween(
-                            durationMillis = 300,
-                            easing = FastOutSlowInEasing
-                        )
-                    }
-                )
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = onLongClick
-                ),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isSelected)
-                    MaterialTheme.colorScheme.primaryContainer
-                else
-                    MaterialTheme.colorScheme.surfaceContainerLow
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-            shape = BentoAsymmetricCardShape
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                // Content preview: display cover thumbnail if it exists
-                if (item.thumbnailPath.isNotBlank()) {
-                    AsyncImage(
-                        model = item.thumbnailPath,
-                        contentDescription = null,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(if (item.id % 2L == 0L) 1.2f else 0.8f) // non-symmetric bento grid aspect ratio
-                            .clip(MaterialTheme.shapes.medium),
-                        contentScale = ContentScale.Crop
-                    )
-                    Spacer(modifier = Modifier.height(com.clipvault.app.ui.theme.Dimensions.itemSpacing))
-                }
- 
-                // Display attachment type indicators
-                val hasLink = item.attachments.any { it.type == "link" }
-                val hasMedia = item.attachments.any { it.type == "media" }
-                val hasFile = item.attachments.any { it.type == "file" }
-                
-                if (hasLink || hasMedia || hasFile) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (hasLink) {
-                            Icon(
-                                imageVector = Icons.Default.Link,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        if (hasMedia) {
-                            Icon(
-                                imageVector = Icons.Default.VideoFile,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                }
- 
-                // Text content
-                if (item.content.isNotBlank()) {
-                    Text(
-                        text = item.content.take(100).let { if (it.length == 100) "$it..." else it },
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = if (item.id % 2L == 0L) 6 else 4, // Bento-like staggered heights
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.sharedElement(
-                            sharedContentState = rememberSharedContentState(key = "text_${item.id}"),
-                            animatedVisibilityScope = animatedVisibilityScope
-                        )
-                    )
-                }
- 
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected)
+                MaterialTheme.colorScheme.primaryContainer
+            else
+                MaterialTheme.colorScheme.surfaceContainerLow
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        shape = BentoAsymmetricCardShape
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Content preview: display cover thumbnail if it exists
+            if (item.thumbnailPath.isNotBlank()) {
+                AsyncImage(
+                    model = item.thumbnailPath,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(if (item.id % 2L == 0L) 1.2f else 0.8f) // non-symmetric bento grid aspect ratio
+                        .clip(MaterialTheme.shapes.medium),
+                    contentScale = ContentScale.Crop
+                )
                 Spacer(modifier = Modifier.height(com.clipvault.app.ui.theme.Dimensions.itemSpacing))
- 
-                // Timestamp
+            }
+
+            // Display attachment type indicators
+            val hasLink = item.attachments.any { it.type == "link" }
+            val hasMedia = item.attachments.any { it.type == "media" }
+            val hasFile = item.attachments.any { it.type == "file" }
+            
+            if (hasLink || hasMedia || hasFile) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (hasLink) {
+                        Icon(
+                            imageVector = Icons.Default.Link,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    if (hasMedia) {
+                        Icon(
+                            imageVector = Icons.Default.VideoFile,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+
+            // Text content
+            if (item.content.isNotBlank()) {
                 Text(
-                    text = dateFormat.format(Date(item.createdAt)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = item.content.take(100).let { if (it.length == 100) "$it..." else it },
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = if (item.id % 2L == 0L) 6 else 4, // Bento-like staggered heights
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+
+            Spacer(modifier = Modifier.height(com.clipvault.app.ui.theme.Dimensions.itemSpacing))
+
+            // Timestamp
+            Text(
+                text = dateFormat.format(Date(item.createdAt)),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

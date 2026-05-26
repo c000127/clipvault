@@ -85,13 +85,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.media3.exoplayer.ExoPlayer
 import coil3.compose.AsyncImage
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.FastOutSlowInEasing
 import com.clipvault.app.data.local.entity.Tag
 import androidx.compose.material.icons.filled.Image
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
@@ -99,11 +92,9 @@ import com.clipvault.app.ui.theme.PillShape
 import com.clipvault.app.ui.theme.ExpressiveBottomSheetShape
 import com.clipvault.app.ui.detail.AiState
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DetailScreen(
-    sharedTransitionScope: SharedTransitionScope,
-    animatedVisibilityScope: AnimatedVisibilityScope,
     onBack: () -> Unit,
     viewModel: DetailViewModel = hiltViewModel()
 ) {
@@ -117,7 +108,6 @@ fun DetailScreen(
     val isEditing by viewModel.isEditing.collectAsState()
     val editContent by viewModel.editContent.collectAsState()
     val editAttachments by viewModel.editAttachments.collectAsState()
-    val editSourceApp by viewModel.editSourceApp.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -141,9 +131,6 @@ fun DetailScreen(
     var showTagEditSheet by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
-    val isFullyVisible = animatedVisibilityScope.transition.currentState == androidx.compose.animation.EnterExitState.Visible &&
-            animatedVisibilityScope.transition.targetState == androidx.compose.animation.EnterExitState.Visible
- 
     // Lifecycle management for media player
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -414,26 +401,15 @@ fun DetailScreen(
         }
     ) { innerPadding ->
         item?.let { clipItem ->
-            with(sharedTransitionScope) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                        .padding(horizontal = 16.dp)
-                        .verticalScroll(rememberScrollState())
-                        .sharedElement(
-                            sharedContentState = rememberSharedContentState(key = "clip_${clipItem.id}"),
-                            animatedVisibilityScope = animatedVisibilityScope,
-                            boundsTransform = { _, _ ->
-                                tween(
-                                    durationMillis = 300,
-                                    easing = FastOutSlowInEasing
-                                )
-                            }
-                        )
-                ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                     // Card 1: Content text if not empty (padded, elevated card with Bento shape)
-                    if (isEditing || clipItem.content.isNotBlank()) {
+                    if (isEditing || clipItem.content.isNotBlank() || clipItem.attachments.isNotEmpty()) {
                         ElevatedCard(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -470,15 +446,6 @@ fun DetailScreen(
                                             .fillMaxWidth()
                                             .height(200.dp),
                                         placeholder = { Text("Write content here...") },
-                                        shape = RoundedCornerShape(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    OutlinedTextField(
-                                        value = editSourceApp,
-                                        onValueChange = { viewModel.updateEditSourceApp(it) },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        label = { Text("Source App") },
-                                        singleLine = true,
                                         shape = RoundedCornerShape(16.dp)
                                     )
                                 } else {
@@ -989,7 +956,6 @@ fun DetailScreen(
                     }
                     Spacer(modifier = Modifier.height(16.dp))
                 }
-            }
         } ?: Box(
             modifier = Modifier
                 .fillMaxSize()
