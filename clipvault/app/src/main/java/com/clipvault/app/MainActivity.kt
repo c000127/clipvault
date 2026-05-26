@@ -23,6 +23,10 @@ import dagger.hilt.android.AndroidEntryPoint
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 
 import javax.inject.Inject
 import com.clipvault.app.ui.theme.ThemePreferences
@@ -57,7 +61,12 @@ class MainActivity : ComponentActivity() {
                         startDestination = Screen.Home,
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        composable<Screen.Home> {
+                        composable<Screen.Home>(
+                            enterTransition = { null },
+                            exitTransition = { null },
+                            popEnterTransition = { null },
+                            popExitTransition = { null }
+                        ) {
                             HomeScreen(
                                 sharedTransitionScope = this@SharedTransitionLayout,
                                 animatedVisibilityScope = this@composable,
@@ -81,7 +90,24 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable<Screen.Detail> { backStackEntry ->
+                        composable<Screen.Detail>(
+                            enterTransition = {
+                                slideInHorizontally(
+                                    animationSpec = tween(200, easing = FastOutSlowInEasing)
+                                ) { it / 4 }
+                            },
+                            exitTransition = {
+                                slideOutHorizontally(
+                                    animationSpec = tween(200)
+                                ) { it / 4 }
+                            },
+                            popEnterTransition = { null },
+                            popExitTransition = {
+                                slideOutHorizontally(
+                                    animationSpec = tween(200)
+                                ) { it / 4 }
+                            }
+                        ) { backStackEntry ->
                             DetailScreen(
                                 sharedTransitionScope = this@SharedTransitionLayout,
                                 animatedVisibilityScope = this@composable,
@@ -89,7 +115,12 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable<Screen.New> { backStackEntry ->
+                        composable<Screen.New>(
+                            enterTransition = { null },
+                            exitTransition = { null },
+                            popEnterTransition = { null },
+                            popExitTransition = { null }
+                        ) { backStackEntry ->
                             android.util.Log.d("MainActivity", "navigating to New screen")
                             val route = backStackEntry.toRoute<Screen.New>()
                             NewItemScreen(
@@ -98,13 +129,23 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable<Screen.TagManager> {
+                        composable<Screen.TagManager>(
+                            enterTransition = { null },
+                            exitTransition = { null },
+                            popEnterTransition = { null },
+                            popExitTransition = { null }
+                        ) {
                             TagManagerScreen(
                                 onBack = { navController.popBackStack() }
                             )
                         }
 
-                        composable<Screen.Settings> {
+                        composable<Screen.Settings>(
+                            enterTransition = { null },
+                            exitTransition = { null },
+                            popEnterTransition = { null },
+                            popExitTransition = { null }
+                        ) {
                             SettingsScreen(
                                 onBack = { navController.popBackStack() },
                                 onAiSettings = {
@@ -113,7 +154,12 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable<Screen.AiSettings> {
+                        composable<Screen.AiSettings>(
+                            enterTransition = { null },
+                            exitTransition = { null },
+                            popEnterTransition = { null },
+                            popExitTransition = { null }
+                        ) {
                             AiSettingsScreen(
                                 onBack = { navController.popBackStack() }
                             )

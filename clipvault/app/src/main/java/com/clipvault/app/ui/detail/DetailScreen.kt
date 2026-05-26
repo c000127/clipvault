@@ -37,6 +37,12 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Label
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.clickable
@@ -86,9 +92,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.shape.RoundedCornerShape
+import com.clipvault.app.data.local.entity.Tag
+import androidx.compose.material.icons.filled.Image
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
 import com.clipvault.app.ui.theme.ExpressiveBottomSheetShape
@@ -116,13 +121,20 @@ fun DetailScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val pickerLauncher = rememberLauncherForActivityResult(
+    // 文件选择器（编辑模式添加附件用）
+    val attachmentPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         uri?.let {
-            val mimeType = context.contentResolver.getType(it)
-            viewModel.addAttachmentToEdit(it, mimeType)
+            viewModel.addAttachmentToEdit(it, context.contentResolver.getType(it))
         }
+    }
+
+    // 图片选择器
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { viewModel.addAttachmentToEdit(it, "image/jpeg") }
     }
  
     var showAiResultSheet by remember { mutableStateOf(false) }
@@ -594,14 +606,28 @@ fun DetailScreen(
                                     }
                                 }
                                 Spacer(modifier = Modifier.height(12.dp))
-                                OutlinedButton(
-                                    onClick = { pickerLauncher.launch("*/*") },
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = PillShape
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Add Attachment")
+                                    OutlinedButton(
+                                        onClick = { imagePickerLauncher.launch("image/*") },
+                                        modifier = Modifier.weight(1f),
+                                        shape = PillShape
+                                    ) {
+                                        Icon(Icons.Default.Image, contentDescription = null)
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Add Image")
+                                    }
+                                    OutlinedButton(
+                                        onClick = { attachmentPickerLauncher.launch("*/*") },
+                                        modifier = Modifier.weight(1f),
+                                        shape = PillShape
+                                    ) {
+                                        Icon(Icons.Default.AttachFile, contentDescription = null)
+                                        Spacer(Modifier.width(4.dp))
+                                        Text("Add File")
+                                    }
                                 }
                             }
                         }
@@ -864,28 +890,90 @@ fun DetailScreen(
                             }
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                            // 构建选中 tag 的树形结构（只显示已选 tags 的层级关系）
+                            val selectedTagTree = remember(tags, allTags) {
+                                val tagMap = allTags.associateBy { it.id }
+                                // 找出所有已选 tag 及其所有祖先
+                                val ancestors = mutableSetOf<Tag>()
                                 tags.forEach { tag ->
-                                    val path = tagPaths[tag.id] ?: tag.name
-                                    androidx.compose.material3.AssistChip(
-                                        onClick = {},
-                                        label = {
-                                            Text(
-                                                text = path,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Ellipsis
+                                    var current: Tag? = tag
+                                    var safety = 50
+                                    while (current != null && safety-- > 0) {
+                                        ancestors.add(current)
+                                        current = tagMap[current.parentId]
+                                    }
+                                }
+                                // 按层级排序：parent → children
+                                ancestors.sortedBy { tag ->
+                                    var count = 0
+                                    var c: Tag? = tag
+                                    while (c != null) { count++; c = tagMap[c.parentId] }
+                                    count
+                                }
+                            }
+
+                            // 用 Column 树形展示
+                            Column(modifier = Modifier.padding(4.dp)) {
+                                selectedTagTree.forEach { tag ->
+                                    val isSelectedTag = tags.any { it.id == tag.id }  // 是否直接选中（vs 祖先）
+                                    val depth = tagPaths[tag.id]?.count { it == '/' } ?: 0
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = (depth * 24).dp, top = 2.dp, bottom = 2.dp)
+                                            .background(
+                                                color = if (isSelectedTag)
+                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                                else Color.Transparent,
+                                                shape = RoundedCornerShape(4.dp)
                                             )
-                                        },
-                                        border = null,
-                                        colors = androidx.compose.material3.AssistChipDefaults.assistChipColors(
-                                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                            labelColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                        ),
-                                        modifier = Modifier.widthIn(max = 200.dp)
-                                    )
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // 层级指示线/点
+                                        if (depth > 0) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(2.dp)
+                                                    .height(20.dp)
+                                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                        }
+                                        // 图标
+                                        Icon(
+                                            imageVector = if (isSelectedTag) Icons.Default.Label else Icons.Default.Folder,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                            tint = if (isSelectedTag)
+                                                MaterialTheme.colorScheme.primary
+                                            else
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        // 名称
+                                        Text(
+                                            text = tag.name,
+                                            style = if (isSelectedTag)
+                                                MaterialTheme.typography.bodyLarge
+                                            else
+                                                MaterialTheme.typography.bodyMedium,
+                                            color = if (isSelectedTag)
+                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                            else
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        // 如果子 tag 被选中，已选标记
+                                        if (isSelectedTag) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(16.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                 }
                             }
 

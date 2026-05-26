@@ -35,7 +35,19 @@ fun TagTreeSelector(
     var searchQuery by remember { mutableStateOf("") }
     
     // Track expanded status
-    val expandedIds = remember { mutableStateMapOf<Long, Boolean>() }
+    val expandedIds = remember(allTags, selectedTagIds) {
+        val map = mutableStateMapOf<Long, Boolean>()
+        val parentMap = allTags.associateBy { it.id }
+        for (selectedId in selectedTagIds) {
+            val tag = allTags.find { it.id == selectedId } ?: continue
+            var currentParentId = tag.parentId
+            while (currentParentId != null) {
+                map[currentParentId] = true
+                currentParentId = parentMap[currentParentId]?.parentId
+            }
+        }
+        map
+    }
 
     // Build children mapping
     val childrenMap = remember(allTags) {
