@@ -39,9 +39,25 @@ class AiService @Inject constructor() {
      *   - https://api.openai.com/
      *   - https://api.openai.com/v1/chat/completions
      */
-    private fun buildChatUrl(baseUrl: String): String {
+    private fun buildChatUrl(baseUrl: String, providerName: String? = null): String {
         val url = baseUrl.trim().trimEnd('/')
-
+        val urlLower = url.lowercase()
+        
+        // 检测是否为 Anthropic API
+        val isAnthropic = providerName?.lowercase()?.contains("anthropic") == true 
+            || urlLower.contains("anthropic")
+            || urlLower.contains("api.anthropic.com")
+        
+        if (isAnthropic) {
+            return when {
+                url.endsWith("/messages") -> url
+                url.contains("/messages/") -> url
+                url.endsWith("/v1") -> "$url/messages"
+                else -> "$url/v1/messages"
+            }
+        }
+        
+        // OpenAI 格式（原逻辑）
         return when {
             url.endsWith("/chat/completions") -> url
             url.contains("/chat/completions/") -> url
@@ -71,17 +87,32 @@ class AiService @Inject constructor() {
         imagePath: String? = null
     ): AiResult = withContext(Dispatchers.IO) {
         try {
-            val url = buildChatUrl(provider.baseUrl)
+            val isAnthropic = isAnthropicProvider(provider)
+            val url = buildChatUrl(provider.baseUrl, provider.name)
 
-            val messages = buildMessages(provider.systemPrompt, content, contentType, imagePath, provider.supportsVision)
-            val requestBody = buildRequestBody(provider, messages)
-
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("Authorization", "Bearer $apiKey")
-                .addHeader("Content-Type", "application/json")
-                .post(requestBody.toRequestBody("application/json".toMediaType()))
-                .build()
+            val request = if (isAnthropic) {
+                val messages = buildAnthropicMessages(provider.systemPrompt, content, contentType)
+                val requestBody = buildAnthropicRequestBody(provider, messages)
+                
+                Request.Builder()
+                    .url(url)
+                    .addHeader("x-api-key", apiKey)
+                    .addHeader("anthropic-version", "2023-06-01")
+                    .addHeader("Content-Type", "application/json")
+                    .post(requestBody.toRequestBody("application/json".toMediaType()))
+                    .build()
+            } else {
+                val messages = buildMessages(provider.systemPrompt, content, contentType, imagePath, provider.supportsVision)
+                val requestBody = buildRequestBody(provider, messages)
+                
+                Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", "Bearer $apiKey")
+                    .addHeader("api-key", apiKey)  // 备选认证，部分 API 需要
+                    .addHeader("Content-Type", "application/json")
+                    .post(requestBody.toRequestBody("application/json".toMediaType()))
+                    .build()
+            }
 
             val response = client.newCall(request).execute()
             val responseBody = response.body?.string() ?: ""
@@ -90,8 +121,14 @@ class AiService @Inject constructor() {
                 401, 403 -> AiResult.Error("API Key 无效或已过期")
                 429 -> AiResult.Error("请求频率过高")
                 in 500..599 -> AiResult.Error("AI 服务暂时不可用")
-                200 -> parseResponse(responseBody)
-                else -> AiResult.Error("请求失败: HTTP ${response.code}")
+                200 -> {
+                    if (isAnthropic) {
+                        parseAnthropicResponse(responseBody)
+                    } else {
+                        parseResponse(responseBody)
+                    }
+                }
+                else -> AiResult.Error("请求失败: HTTP ${response.code}\n${responseBody.take(200)}")
             }
         } catch (e: java.net.SocketTimeoutException) {
             AiResult.Error("请求超时")
@@ -107,35 +144,130 @@ class AiService @Inject constructor() {
         apiKey: String
     ): AiResult = withContext(Dispatchers.IO) {
         try {
-            val url = buildChatUrl(provider.baseUrl)
+            val isAnthropic = isAnthropicProvider(provider)
+            val url = buildChatUrl(provider.baseUrl, provider.name)
 
-            val messages = listOf(
-                mapOf("role" to "user", "content" to "Say 'Hello'")
-            )
-            val requestBody = buildRequestBody(provider, messages)
-
-            val request = Request.Builder()
-                .url(url)
-                .addHeader("Authorization", "Bearer $apiKey")
-                .addHeader("Content-Type", "application/json")
-                .post(requestBody.toRequestBody("application/json".toMediaType()))
-                .build()
+            val request = if (isAnthropic) {
+                val body = mapOf(
+                    "model" to provider.modelName,
+                    "max_tokens" to 10,
+                    "messages" to listOf(mapOf("role" to "user", "content" to "Hi"))
+                )
+                Request.Builder()
+                    .url(url)
+                    .addHeader("x-api-key", apiKey)
+                    .addHeader("anthropic-version", "2023-06-01")
+                    .addHeader("Content-Type", "application/json")
+                    .post(gson.toJson(body).toRequestBody("application/json".toMediaType()))
+                    .build()
+            } else {
+                val messages = listOf(mapOf("role" to "user", "content" to "Say 'Hello'"))
+                val body = mapOf(
+                    "model" to provider.modelName,
+                    "messages" to messages,
+                    "max_tokens" to 10,
+                    "stream" to false
+                )
+                Request.Builder()
+                    .url(url)
+                    .addHeader("Authorization", "Bearer $apiKey")
+                    .addHeader("api-key", apiKey)
+                    .addHeader("Content-Type", "application/json")
+                    .post(gson.toJson(body).toRequestBody("application/json".toMediaType()))
+                    .build()
+            }
 
             val response = client.newCall(request).execute()
-
             when (response.code) {
                 401, 403 -> AiResult.Error("API Key 无效或已过期")
                 429 -> AiResult.Error("请求频率过高")
                 in 500..599 -> AiResult.Error("AI 服务暂时不可用")
                 200 -> AiResult.Success("Connection successful", emptyList())
-                else -> AiResult.Error("测试失败: HTTP ${response.code}")
+                else -> AiResult.Error("测试失败: HTTP ${response.code}\n${response.body?.string()?.take(200)}")
             }
         } catch (e: java.net.SocketTimeoutException) {
             AiResult.Error("连接超时")
         } catch (e: java.io.IOException) {
             AiResult.Error("网络错误: ${e.message}")
         } catch (e: Exception) {
-            AiResult.Error("未知错误: ${e.message}")
+            AiResult.Error("连接失败: ${e.message}")
+        }
+    }
+
+    private fun isAnthropicProvider(provider: AiProvider): Boolean {
+        val name = provider.name.lowercase()
+        val url = provider.baseUrl.lowercase()
+        return name.contains("anthropic") || url.contains("anthropic") || url.contains("api.anthropic.com")
+    }
+
+    private fun buildAnthropicMessages(systemPrompt: String, content: String, contentType: String): List<Map<String, Any>> {
+        val messages = mutableListOf<Map<String, Any>>()
+        
+        when (contentType) {
+            "image" -> {
+                messages.add(mapOf(
+                    "role" to "user",
+                    "content" to "[图片收藏] 请分析这张图片的内容"
+                ))
+            }
+            "link" -> {
+                messages.add(mapOf(
+                    "role" to "user",
+                    "content" to "URL: $content"
+                ))
+            }
+            else -> {
+                messages.add(mapOf(
+                    "role" to "user",
+                    "content" to content
+                ))
+            }
+        }
+        
+        return messages
+    }
+
+    private fun buildAnthropicRequestBody(provider: AiProvider, messages: List<Map<String, Any>>): String {
+        val body = mapOf(
+            "model" to provider.modelName,
+            "system" to provider.systemPrompt,
+            "messages" to messages,
+            "max_tokens" to provider.maxTokens,
+            "temperature" to provider.temperature
+        )
+        return gson.toJson(body)
+    }
+
+    private fun parseAnthropicResponse(responseBody: String): AiResult {
+        return try {
+            val json = JsonParser.parseString(responseBody).asJsonObject
+            
+            // 检查错误
+            json.get("error")?.asJsonObject?.let { error ->
+                return AiResult.Error(error.get("message")?.asString ?: "Anthropic API error")
+            }
+            
+            val content = json.getAsJsonArray("content")
+            if (content == null || content.size() == 0) {
+                return AiResult.Error("AI 未返回有效内容")
+            }
+            
+            val text = content[0].asJsonObject.get("text")?.asString ?: ""
+            if (text.isBlank()) return AiResult.Error("AI 未返回有效内容")
+            
+            // 尝试解析 JSON
+            try {
+                val aiResponse = JsonParser.parseString(text).asJsonObject
+                val summary = aiResponse.get("summary")?.asString ?: text
+                val tags = aiResponse.getAsJsonArray("suggested_tags")
+                    ?.map { it.asString }
+                    ?: emptyList()
+                AiResult.Success(summary, tags)
+            } catch (e: Exception) {
+                AiResult.Success(text, emptyList())
+            }
+        } catch (e: Exception) {
+            AiResult.Error("解析响应失败: ${e.message}")
         }
     }
 

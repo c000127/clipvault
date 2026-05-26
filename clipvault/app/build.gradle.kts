@@ -88,4 +88,6 @@ dependencies {
     implementation(libs.coil.network.okhttp)
     implementation(libs.jsoup)
     coreLibraryDesugaring(libs.desugar.jdk.libs.nio)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
