@@ -56,6 +56,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.clipvault.app.data.local.entity.AiProvider
+import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
+import com.clipvault.app.ui.theme.PillShape
+import androidx.compose.material3.ElevatedCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,7 +104,10 @@ fun AiSettingsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.showAddForm() }) {
+            FloatingActionButton(
+                onClick = { viewModel.showAddForm() },
+                shape = PillShape
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Provider")
             }
         }
@@ -153,14 +159,16 @@ private fun ProviderCard(
     onDelete: () -> Unit,
     onSetActive: () -> Unit
 ) {
-    Card(
+    ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
+        shape = BentoAsymmetricCardShape,
+        colors = CardDefaults.elevatedCardColors(
             containerColor = if (provider.isActive)
                 MaterialTheme.colorScheme.primaryContainer
             else
                 MaterialTheme.colorScheme.surfaceContainerLow
-        )
+        ),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -197,7 +205,11 @@ private fun ProviderCard(
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onSetActive, enabled = !provider.isActive) {
+                Button(
+                    onClick = onSetActive,
+                    enabled = !provider.isActive,
+                    shape = PillShape
+                ) {
                     Text("Activate")
                 }
                 IconButton(onClick = onEdit) {
@@ -284,7 +296,8 @@ private fun ProviderFormDialog(
                 Button(
                     onClick = onTest,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = testState !is TestState.Loading
+                    enabled = testState !is TestState.Loading,
+                    shape = PillShape
                 ) {
                     if (testState is TestState.Loading) {
                         CircularProgressIndicator(

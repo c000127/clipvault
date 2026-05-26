@@ -26,6 +26,11 @@ import com.clipvault.app.ui.theme.ThemeMode
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import com.clipvault.app.ui.theme.ClipVaultMotion
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -33,6 +38,7 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var themePreferences: ThemePreferences
 
+    @OptIn(ExperimentalSharedTransitionApi::class, androidx.compose.animation.ExperimentalAnimationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -46,97 +52,70 @@ class MainActivity : ComponentActivity() {
             ClipVaultTheme(darkTheme = darkTheme) {
                 val navController = rememberNavController()
 
-                NavHost(
-                    navController = navController,
-                    startDestination = Screen.Home,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    composable<Screen.Home>(
-                        enterTransition = { null },
-                        exitTransition = { null },
-                        popEnterTransition = { null },
-                        popExitTransition = { null }
+                SharedTransitionLayout {
+                    NavHost(
+                        navController = navController,
+                        startDestination = Screen.Home,
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        HomeScreen(
-                            onItemClick = { id ->
-                                navController.navigate(Screen.Detail(id))
-                            },
-                            onNewItem = {
-                                try {
-                                    android.util.Log.d("HomeScreen", "navigating to Screen.New()")
+                        composable<Screen.Home>(
+                            enterTransition = { fadeIn(androidx.compose.animation.core.tween(ClipVaultMotion.ShortDuration)) },
+                            exitTransition = { fadeOut(androidx.compose.animation.core.tween(ClipVaultMotion.ShortDuration)) }
+                        ) {
+                            HomeScreen(
+                                sharedTransitionScope = this@SharedTransitionLayout,
+                                animatedVisibilityScope = this@composable,
+                                onItemClick = { id ->
+                                    navController.navigate(Screen.Detail(id))
+                                },
+                                onNewItem = {
                                     navController.navigate(Screen.New())
-                                } catch (e: Exception) {
-                                    android.util.Log.e("HomeScreen", "navigation failed", e)
+                                },
+                                onTagManager = {
+                                    navController.navigate(Screen.TagManager)
+                                },
+                                onSettings = {
+                                    navController.navigate(Screen.Settings)
                                 }
-                            },
-                            onTagManager = {
-                                navController.navigate(Screen.TagManager)
-                            },
-                            onSettings = {
-                                navController.navigate(Screen.Settings)
-                            }
-                        )
-                    }
+                            )
+                        }
 
-                    composable<Screen.Detail>(
-                        enterTransition = { null },
-                        exitTransition = { null },
-                        popEnterTransition = { null },
-                        popExitTransition = { null }
-                    ) { backStackEntry ->
-                        DetailScreen(
-                            onBack = { navController.popBackStack() }
-                        )
-                    }
+                        composable<Screen.Detail>(
+                            enterTransition = { fadeIn(androidx.compose.animation.core.tween(ClipVaultMotion.MediumDuration)) },
+                            exitTransition = { fadeOut(androidx.compose.animation.core.tween(ClipVaultMotion.ShortDuration)) }
+                        ) {
+                            DetailScreen(
+                                sharedTransitionScope = this@SharedTransitionLayout,
+                                animatedVisibilityScope = this@composable,
+                                onBack = { navController.popBackStack() }
+                            )
+                        }
 
-                    composable<Screen.New>(
-                        enterTransition = { null },
-                        exitTransition = { null },
-                        popEnterTransition = { null },
-                        popExitTransition = { null }
-                    ) { backStackEntry ->
-                        android.util.Log.d("MainActivity", "navigating to New screen")
-                        val route = backStackEntry.toRoute<Screen.New>()
-                        NewItemScreen(
-                            onBack = { navController.popBackStack() },
-                            initialText = route.text
-                        )
-                    }
+                        composable<Screen.New>(
+                            enterTransition = { fadeIn(androidx.compose.animation.core.tween(ClipVaultMotion.ShortDuration)) },
+                            exitTransition = { fadeOut(androidx.compose.animation.core.tween(ClipVaultMotion.ShortDuration)) }
+                        ) { backStackEntry ->
+                            val route = backStackEntry.toRoute<Screen.New>()
+                            NewItemScreen(
+                                onBack = { navController.popBackStack() },
+                                initialText = route.text
+                            )
+                        }
 
-                    composable<Screen.TagManager>(
-                        enterTransition = { null },
-                        exitTransition = { null },
-                        popEnterTransition = { null },
-                        popExitTransition = { null }
-                    ) {
-                        TagManagerScreen(
-                            onBack = { navController.popBackStack() }
-                        )
-                    }
+                        composable<Screen.TagManager> {
+                            TagManagerScreen(onBack = { navController.popBackStack() })
+                        }
 
-                    composable<Screen.Settings>(
-                        enterTransition = { null },
-                        exitTransition = { null },
-                        popEnterTransition = { null },
-                        popExitTransition = { null }
-                    ) {
-                        SettingsScreen(
-                            onBack = { navController.popBackStack() },
-                            onAiSettings = {
-                                navController.navigate(Screen.AiSettings)
-                            }
-                        )
-                    }
+                        composable<Screen.Settings> {
+                            SettingsScreen(
+                                onBack = { navController.popBackStack() },
+                                onAiSettings = { navController.navigate(Screen.AiSettings) }
+                            )
+                        }
 
-                    composable<Screen.AiSettings>(
-                        enterTransition = { null },
-                        exitTransition = { null },
-                        popEnterTransition = { null },
-                        popExitTransition = { null }
-                    ) {
-                        AiSettingsScreen(
-                            onBack = { navController.popBackStack() }
-                        )
+                        composable<Screen.AiSettings> {
+                            AiSettingsScreen(onBack = { navController.popBackStack() })
+                        }
                     }
                 }
             }

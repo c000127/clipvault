@@ -1,6 +1,10 @@
 package com.clipvault.app.ui.home
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -104,6 +108,8 @@ fun TagFilterSheet(
                     fun androidx.compose.foundation.lazy.LazyListScope.renderNode(node: FilterTagNode) {
                         item(key = node.tag.id) {
                             val isSelected = selectedTagIds.contains(node.tag.id)
+                            val depth = node.depth
+                            
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -116,9 +122,27 @@ fun TagFilterSheet(
                                             }
                                         }
                                     }
-                                    .padding(start = (node.depth * 20).dp, top = 8.dp, bottom = 8.dp),
+                                    .padding(start = (depth * 12).dp)
+                                    .height(48.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                // Vertical lines for hierarchy
+                                repeat(depth) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(16.dp)
+                                            .fillMaxHeight()
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(1.dp)
+                                                .fillMaxHeight()
+                                                .align(Alignment.Center)
+                                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                        )
+                                    }
+                                }
+
                                 // Toggle Expand icon
                                 if (node.children.isNotEmpty()) {
                                     Icon(
@@ -132,7 +156,8 @@ fun TagFilterSheet(
                                                 } else {
                                                     expandedIds + node.tag.id
                                                 }
-                                            }
+                                            },
+                                        tint = MaterialTheme.colorScheme.primary
                                     )
                                 } else {
                                     Spacer(modifier = Modifier.width(24.dp))
@@ -143,12 +168,12 @@ fun TagFilterSheet(
                                     onCheckedChange = { onTagToggle(node.tag.id) }
                                 )
 
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
 
                                 Icon(
                                     imageVector = Icons.Default.Label,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
                                     modifier = Modifier.size(18.dp)
                                 )
 
@@ -156,7 +181,8 @@ fun TagFilterSheet(
 
                                 Text(
                                     text = node.tag.name,
-                                    style = MaterialTheme.typography.bodyLarge
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }

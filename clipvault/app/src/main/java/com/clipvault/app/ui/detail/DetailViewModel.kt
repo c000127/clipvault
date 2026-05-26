@@ -56,7 +56,7 @@ class DetailViewModel @Inject constructor(
     private val aiService: com.clipvault.app.data.remote.AiService
 ) : ViewModel() {
 
-    private val itemId: Long = savedStateHandle["id"] ?: 0L
+    val itemId: Long = savedStateHandle["id"] ?: 0L
 
     private val _item = MutableStateFlow<ClipItem?>(null)
     val item: StateFlow<ClipItem?> = _item.asStateFlow()

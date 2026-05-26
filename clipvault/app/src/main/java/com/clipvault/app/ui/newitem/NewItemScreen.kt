@@ -48,6 +48,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
+import com.clipvault.app.ui.theme.PillShape
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.CardDefaults
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
@@ -144,7 +148,7 @@ fun NewItemScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // Content input (16dp rounded corners)
+            // Content input (Bento shape)
             OutlinedTextField(
                 value = content,
                 onValueChange = { viewModel.setContent(it) },
@@ -153,7 +157,7 @@ fun NewItemScreen(
                     .height(200.dp),
                 label = { Text("Content") },
                 placeholder = { Text("Enter text, URL, or paste content...") },
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
+                shape = BentoAsymmetricCardShape
             )
 
             if (attachments.isNotEmpty()) {
@@ -163,43 +167,55 @@ fun NewItemScreen(
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     attachments.forEachIndexed { index, attachment ->
-                        Row(
+                        ElevatedCard(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                            shape = BentoAsymmetricCardShape,
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                            ),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
                         ) {
-                            if (attachment.type == "image") {
-                                AsyncImage(
-                                    model = attachment.filePath,
-                                    contentDescription = "Selected image preview",
-                                    modifier = Modifier
-                                        .size(80.dp)
-                                        .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
-                                    contentScale = ContentScale.Crop
-                                )
-                            } else {
-                                Row(
-                                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(
-                                        imageVector = if (attachment.type == "media") Icons.Default.CameraAlt else Icons.Default.Save,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                            ) {
+                                if (attachment.type == "image") {
+                                    AsyncImage(
+                                        model = attachment.filePath,
+                                        contentDescription = "Selected image preview",
+                                        modifier = Modifier
+                                            .size(80.dp)
+                                            .clip(BentoAsymmetricCardShape),
+                                        contentScale = ContentScale.Crop
                                     )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = attachment.filePath.substringAfterLast('/'),
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                } else {
+                                    Row(
+                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f).padding(start = 8.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (attachment.type == "media") Icons.Default.CameraAlt else Icons.Default.Save,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(24.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = attachment.filePath.substringAfterLast('/'),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
-                            }
-                            IconButton(onClick = { viewModel.removeAttachment(index) }) {
-                                Icon(Icons.Default.Close, contentDescription = "Remove")
+                                IconButton(onClick = { viewModel.removeAttachment(index) }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
                     }
@@ -220,14 +236,14 @@ fun NewItemScreen(
             ) {
                 OutlinedButton(
                     onClick = { imagePickerLauncher.launch("image/*") },
-                    shape = com.clipvault.app.ui.theme.PillShape
+                    shape = PillShape
                 ) {
                     Icon(Icons.Default.Image, contentDescription = null)
                     Text("Gallery")
                 }
                 OutlinedButton(
                     onClick = { filePickerLauncher.launch("*/*") },
-                    shape = com.clipvault.app.ui.theme.PillShape
+                    shape = PillShape
                 ) {
                     Icon(Icons.Default.CameraAlt, contentDescription = null)
                     Text("File")
@@ -266,21 +282,21 @@ fun NewItemScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // New tag input (16dp rounded corners)
+            // New tag input (Bento shape)
             OutlinedTextField(
                 value = newTagName,
                 onValueChange = { newTagName = it },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("New tag name") },
                 singleLine = true,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                shape = BentoAsymmetricCardShape,
                 trailingIcon = {
                     if (newTagName.isNotBlank()) {
                         IconButton(onClick = {
                             viewModel.createTag(newTagName, null)
                             newTagName = ""
                         }) {
-                            Text("Add", style = MaterialTheme.typography.labelMedium)
+                            Icon(Icons.Default.Save, contentDescription = "Add")
                         }
                     }
                 }
@@ -293,7 +309,7 @@ fun NewItemScreen(
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !isSaving && (content.isNotBlank() || attachments.isNotEmpty()),
-                shape = com.clipvault.app.ui.theme.PillShape
+                shape = PillShape
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(

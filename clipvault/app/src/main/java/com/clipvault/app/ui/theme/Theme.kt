@@ -41,6 +41,22 @@ val ExpressiveBottomSheetShape = RoundedCornerShape(
 
 val PillShape = RoundedCornerShape(50.dp)
 
+// Standard Motion Schemes
+object ClipVaultMotion {
+    // 弹性弹簧：用于卡片按压、展开
+    val BouncySpring = androidx.compose.animation.core.spring<Float>(
+        dampingRatio = 0.7f,
+        stiffness = 400f
+    )
+    
+    // 快速缓动：用于淡入淡出、平移
+    val FastOutSlowIn = androidx.compose.animation.core.FastOutSlowInEasing
+    
+    // 标准动画时长
+    val ShortDuration = 200
+    val MediumDuration = 400
+}
+
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,

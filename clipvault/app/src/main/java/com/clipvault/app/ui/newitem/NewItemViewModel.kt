@@ -71,6 +71,54 @@ class NewItemViewModel @Inject constructor(
  
     fun setContent(text: String) {
         _content.value = text
+        // URL 自动检测逻辑
+        if (text.isNotBlank() && (text.startsWith("http://") || text.startsWith("https://")) && !text.contains(" ")) {
+            autoFetchUrl(text)
+        }
+    }
+
+    private var lastFetchedUrl: String? = null
+    
+    private fun autoFetchUrl(url: String) {
+        if (url == lastFetchedUrl) return
+        lastFetchedUrl = url
+        
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val doc = org.jsoup.Jsoup.connect(url)
+                    .userAgent("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+                    .timeout(10000)
+                    .get()
+                
+                val title = doc.title()
+                val mainContent = doc.select("article, main, [role=main]").text()
+                val text = if (mainContent.length >= 50) mainContent else doc.body().text()
+                
+                withContext(Dispatchers.Main) {
+                    if (title.isNotBlank()) {
+                        // 自动将链接转化为附件
+                        val existingLink = _attachments.value.any { it.type == "link" && it.filePath == url }
+                        if (!existingLink) {
+                            val linkAttachment = ContentAttachment(
+                                itemId = 0L,
+                                type = "link",
+                                filePath = url,
+                                thumbnailPath = "",
+                                orderIndex = _attachments.value.size
+                            )
+                            _attachments.value = _attachments.value + linkAttachment
+                        }
+                        
+                        // 如果内容框只有 URL，追加标题
+                        if (_content.value == url) {
+                            _content.value = "$title\n\n$url"
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("NewItemVM", "Auto fetch failed", e)
+            }
+        }
     }
  
     fun toggleTag(tagId: Long) {

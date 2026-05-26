@@ -1,6 +1,14 @@
 package com.clipvault.app.ui.tagmanager
 
 import com.clipvault.app.data.local.entity.Tag
+import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
+import com.clipvault.app.ui.theme.PillShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -133,7 +141,10 @@ fun TagManagerScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { viewModel.showCreateDialog(null) }) {
+            FloatingActionButton(
+                onClick = { viewModel.showCreateDialog(null) },
+                shape = PillShape
+            ) {
                 Icon(Icons.Default.Add, contentDescription = "Add Tag")
             }
         }
@@ -227,60 +238,96 @@ private fun TagRow(
     onDelete: () -> Unit,
     onMove: () -> Unit
 ) {
-    Card(
+    val depth = node.depth
+    
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = (node.depth * 24).dp, bottom = 4.dp)
+            .padding(start = (depth * 12).dp) // Reduced base indentation to fit lines
+            .height(56.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
+        // Vertical lines for hierarchy
+        repeat(depth) { d ->
+            Box(
+                modifier = Modifier
+                    .width(16.dp)
+                    .fillMaxHeight()
+            ) {
+                // Vertical line
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .fillMaxHeight()
+                        .align(Alignment.Center)
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                )
+            }
+        }
+
+        ElevatedCard(
             modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggleExpand)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .weight(1f)
+                .padding(vertical = 4.dp, horizontal = 4.dp),
+            shape = BentoAsymmetricCardShape,
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = if (node.children.isNotEmpty() && node.isExpanded)
+                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
+                else
+                    MaterialTheme.colorScheme.surfaceContainerLow
+            ),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
         ) {
-            // Expand/collapse icon
-            if (node.children.isNotEmpty()) {
-                Icon(
-                    imageVector = if (node.isExpanded) Icons.Default.ArrowDropDown else Icons.Default.ArrowRight,
-                    contentDescription = if (node.isExpanded) "Collapse" else "Expand",
-                    modifier = Modifier.size(24.dp)
-                )
-            } else {
-                Spacer(modifier = Modifier.width(24.dp))
-            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggleExpand)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Expand/collapse icon
+                if (node.children.isNotEmpty()) {
+                    Icon(
+                        imageVector = if (node.isExpanded) Icons.Default.ArrowDropDown else Icons.Default.ArrowRight,
+                        contentDescription = if (node.isExpanded) "Collapse" else "Expand",
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.Folder,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = MaterialTheme.colorScheme.outline
+                    )
+                }
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // Tag name
-            Text(
-                text = node.tag.name,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f)
-            )
-
-            // Child count
-            if (node.children.isNotEmpty()) {
-                Text(
-                    text = "${node.children.size}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
                 Spacer(modifier = Modifier.width(8.dp))
-            }
 
-            // Action buttons
-            IconButton(onClick = onAddChild, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Add, contentDescription = "Add child", modifier = Modifier.size(18.dp))
-            }
-            IconButton(onClick = onRename, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Edit, contentDescription = "Rename", modifier = Modifier.size(18.dp))
-            }
-            IconButton(onClick = onMove, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.DriveFileMove, contentDescription = "Move", modifier = Modifier.size(18.dp))
-            }
-            IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(18.dp))
+                // Tag name
+                Text(
+                    text = node.tag.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f),
+                    color = if (node.children.isNotEmpty() && node.isExpanded)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurface
+                )
+
+                // Action buttons
+                IconButton(onClick = onAddChild, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Add, contentDescription = "Add child", modifier = Modifier.size(18.dp))
+                }
+                IconButton(onClick = onRename, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = "Rename", modifier = Modifier.size(18.dp))
+                }
+                IconButton(onClick = onMove, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.DriveFileMove, contentDescription = "Move", modifier = Modifier.size(18.dp))
+                }
+                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }

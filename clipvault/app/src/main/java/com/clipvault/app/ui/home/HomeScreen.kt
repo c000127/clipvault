@@ -40,6 +40,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -77,13 +79,24 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.Delete
+import com.clipvault.app.ui.theme.ClipVaultMotion
+import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
+import androidx.compose.material3.ElevatedCard
+
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalFoundationApi::class,
-    ExperimentalLayoutApi::class
+    ExperimentalLayoutApi::class,
+    ExperimentalSharedTransitionApi::class
 )
 @Composable
 fun HomeScreen(
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onItemClick: (Long) -> Unit,
     onNewItem: () -> Unit,
     onTagManager: () -> Unit = {},
@@ -93,11 +106,11 @@ fun HomeScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedTagIds by viewModel.selectedTagIds.collectAsState()
     val allTags by viewModel.allTags.collectAsState()
+    val clipboardSuggestion by viewModel.clipboardSuggestion.collectAsState()
+    val selectedItemIds by viewModel.selectedItemIds.collectAsState()
     var showTagFilter by remember { mutableStateOf(false) }
     val pagingItems = viewModel.items.collectAsLazyPagingItems()
  
-    val selectedItems = remember { mutableStateListOf<Long>() }
-
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -128,27 +141,66 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ClipVault") },
+                title = {
+                    if (selectedItemIds.isNotEmpty()) {
+                        Text("${selectedItemIds.size} selected")
+                    } else {
+                        Text("ClipVault")
+                    }
+                },
+                navigationIcon = {
+                    if (selectedItemIds.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.clearItemSelection() }) {
+                            Icon(Icons.Default.Close, contentDescription = "Cancel")
+                        }
+                    }
+                },
                 colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
                     containerColor = androidx.compose.ui.graphics.Color.Transparent,
                     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
                 ),
                 actions = {
-                    IconButton(onClick = { showTagFilter = true }) {
-                        Icon(
-                            imageVector = Icons.Default.FilterList,
-                            contentDescription = "Filter",
-                            tint = if (selectedTagIds.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    IconButton(onClick = onTagManager) {
-                        Icon(Icons.Default.Label, contentDescription = "Tags")
-                    }
-                    IconButton(onClick = onSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    if (selectedItemIds.isEmpty()) {
+                        IconButton(onClick = { showTagFilter = true }) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = "Filter",
+                                tint = if (selectedTagIds.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                        IconButton(onClick = onTagManager) {
+                            Icon(Icons.Default.Label, contentDescription = "Tags")
+                        }
+                        IconButton(onClick = onSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        }
                     }
                 }
             )
+        },
+        bottomBar = {
+            AnimatedVisibility(
+                visible = selectedItemIds.isNotEmpty(),
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+            ) {
+                androidx.compose.material3.BottomAppBar(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    tonalElevation = 8.dp,
+                    actions = {
+                        IconButton(onClick = { viewModel.deleteSelectedItems() }) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+                        }
+                        Spacer(Modifier.width(16.dp))
+                        Text(
+                            "Batch Actions",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                )
+            }
         },
         floatingActionButton = {
             FloatingActionButton(
@@ -284,14 +336,56 @@ fun HomeScreen(
                 }
             }
 
+            // Clipboard Suggestion
+            AnimatedVisibility(
+                visible = clipboardSuggestion != null,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                clipboardSuggestion?.let { text ->
+                    ElevatedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = BentoAsymmetricCardShape,
+                        colors = androidx.compose.material3.CardDefaults.elevatedCardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.ContentPaste, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("发现剪贴板新内容", style = MaterialTheme.typography.labelMedium)
+                                Text(
+                                    text.take(50).let { if (it.length == 50) "$it..." else it },
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            TextButton(onClick = { viewModel.dismissSuggestion() }) { Text("忽略") }
+                            Button(onClick = { viewModel.saveSuggestion() }, shape = PillShape) { Text("保存") }
+                        }
+                    }
+                }
+            }
+
             // Staggered grid
             when (val refreshState = pagingItems.loadState.refresh) {
                 is LoadState.Loading -> {
-                    Box(
+                    LazyVerticalStaggeredGrid(
+                        columns = StaggeredGridCells.Fixed(2),
                         modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
+                        contentPadding = PaddingValues(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalItemSpacing = 16.dp
                     ) {
-                        CircularProgressIndicator()
+                        items(6) {
+                            com.clipvault.app.ui.components.BentoSkeletonItem()
+                        }
                     }
                 }
                 is LoadState.Error -> {
@@ -320,20 +414,32 @@ fun HomeScreen(
                         ) {
                             pagingItems(
                                 items = pagingItems,
-                                key = { it.id }
+                                key = { it.id },
+                                span = { item ->
+                                    // 动态布局逻辑：带图条目或超长文本占据全宽 (Bento Span)
+                                    if (item.thumbnailPath.isNotBlank() || item.content.length > 150) {
+                                        StaggeredGridItemSpan.FullLine
+                                    } else {
+                                        StaggeredGridItemSpan.SingleLane
+                                    }
+                                }
                             ) { clipItem ->
                                 clipItem?.let { item ->
                                     ClipCard(
                                         item = item,
-                                        onClick = { onItemClick(item.id) },
-                                        onLongClick = {
-                                            if (selectedItems.contains(item.id)) {
-                                                selectedItems.remove(item.id)
+                                        sharedTransitionScope = sharedTransitionScope,
+                                        animatedVisibilityScope = animatedVisibilityScope,
+                                        onClick = {
+                                            if (selectedItemIds.isNotEmpty()) {
+                                                viewModel.toggleItemSelection(item.id)
                                             } else {
-                                                selectedItems.add(item.id)
+                                                onItemClick(item.id)
                                             }
                                         },
-                                        isSelected = selectedItems.contains(item.id)
+                                        onLongClick = {
+                                            viewModel.toggleItemSelection(item.id)
+                                        },
+                                        isSelected = selectedItemIds.contains(item.id)
                                     )
                                 }
                             }
@@ -359,22 +465,49 @@ fun HomeScreen(
     }
 }
  
+@OptIn(ExperimentalFoundationApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
-private fun ClipCard(
+private fun LazyStaggeredGridItemScope.ClipCard(
     item: ClipItem,
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     isSelected: Boolean
 ) {
     val dateFormat = remember { SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()) }
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            ),
-        colors = CardDefaults.cardColors(
+    var isPressed by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = ClipVaultMotion.BouncySpring,
+        label = "scale"
+    )
+
+    with(sharedTransitionScope) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateItem() // 添加列表项重排动效
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .sharedElement(
+                    rememberSharedContentState(key = "item_${item.id}"),
+                    animatedVisibilityScope = animatedVisibilityScope
+                )
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            isPressed = true
+                            tryAwaitRelease()
+                            isPressed = false
+                        },
+                        onTap = { onClick() },
+                        onLongPress = { onLongClick() }
+                    )
+                },
+            colors = CardDefaults.cardColors(
             containerColor = if (isSelected)
                 MaterialTheme.colorScheme.primaryContainer
             else
@@ -448,4 +581,5 @@ private fun ClipCard(
             )
         }
     }
+}
 }

@@ -28,19 +28,31 @@ import javax.inject.Inject
 
 import kotlinx.coroutines.flow.map
 import androidx.paging.map
- 
+import android.content.Context
+import android.content.ClipboardManager
+import dagger.hilt.android.qualifiers.ApplicationContext
+
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val clipItemRepository: ClipItemRepository,
     private val tagRepository: TagRepository
 ) : ViewModel() {
  
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _clipboardSuggestion = MutableStateFlow<String?>(null)
+    val clipboardSuggestion: StateFlow<String?> = _clipboardSuggestion.asStateFlow()
+
+    private var lastCheckedClip: String? = null
  
     private val _selectedTagIds = MutableStateFlow<Set<Long>>(emptySet())
     val selectedTagIds: StateFlow<Set<Long>> = _selectedTagIds.asStateFlow()
+
+    private val _selectedItemIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedItemIds: StateFlow<Set<Long>> = _selectedItemIds.asStateFlow()
  
     private val _allTags = MutableStateFlow<List<Tag>>(emptyList())
     val allTags: StateFlow<List<Tag>> = _allTags.asStateFlow()
@@ -86,6 +98,39 @@ class HomeViewModel @Inject constructor(
 
     fun refresh() {
         _refreshTrigger.value = _refreshTrigger.value + 1
+        checkClipboard()
+    }
+
+    fun checkClipboard() {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = cm.primaryClip?.getItemAt(0)?.text?.toString()
+        if (!clip.isNullOrBlank() && clip != lastCheckedClip) {
+            lastCheckedClip = clip
+            viewModelScope.launch {
+                val recent = clipItemRepository.getRecent(50)
+                if (recent.none { it.content == clip }) {
+                    _clipboardSuggestion.value = clip
+                }
+            }
+        }
+    }
+
+    fun dismissSuggestion() {
+        _clipboardSuggestion.value = null
+    }
+
+    fun saveSuggestion() {
+        val text = _clipboardSuggestion.value ?: return
+        _clipboardSuggestion.value = null
+        viewModelScope.launch {
+            val item = ClipItem(
+                content = text,
+                createdAt = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+            clipItemRepository.insertWithTagsAndAttachments(item, emptyList(), emptyList())
+            refresh()
+        }
     }
 
     init {
@@ -118,9 +163,24 @@ class HomeViewModel @Inject constructor(
         _selectedTagIds.value = emptySet()
     }
 
-    fun deleteItems(ids: List<Long>) {
+    fun toggleItemSelection(id: Long) {
+        _selectedItemIds.value = if (_selectedItemIds.value.contains(id)) {
+            _selectedItemIds.value - id
+        } else {
+            _selectedItemIds.value + id
+        }
+    }
+
+    fun clearItemSelection() {
+        _selectedItemIds.value = emptySet()
+    }
+
+    fun deleteSelectedItems() {
+        val ids = _selectedItemIds.value.toList()
         viewModelScope.launch {
             clipItemRepository.deleteByIds(ids)
+            _selectedItemIds.value = emptySet()
+            refresh()
         }
     }
 }

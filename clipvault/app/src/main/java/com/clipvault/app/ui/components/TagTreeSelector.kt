@@ -1,13 +1,16 @@
 package com.clipvault.app.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowRight
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Search
+import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -100,7 +103,7 @@ fun TagTreeSelector(
                 .fillMaxWidth()
                 .padding(bottom = 8.dp),
             singleLine = true,
-            leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Search, contentDescription = null) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             shape = MaterialTheme.shapes.medium
         )
 
@@ -155,61 +158,97 @@ private fun TagTreeNode(
     // Parent highlight background if descendant is selected
     val isParentHighlighted = !isSelected && isAnyDescendantSelected(tag.id)
     val backgroundColor = when {
-        isSelected -> MaterialTheme.colorScheme.primaryContainer
-        isParentHighlighted -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+        isParentHighlighted -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.2f)
         else -> androidx.compose.ui.graphics.Color.Transparent
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Surface(
-            color = backgroundColor,
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = (depth * 12).dp)
+                .height(48.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
+            // Vertical lines for hierarchy
+            repeat(depth) {
+                Box(
+                    modifier = Modifier
+                        .width(16.dp)
+                        .fillMaxHeight()
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .align(Alignment.Center)
+                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    )
+                }
+            }
+
+            Surface(
+                color = backgroundColor,
+                shape = BentoAsymmetricCardShape,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { onTagToggle(tag.id, !isSelected) }
-                    .padding(start = (depth * 16).dp, top = 6.dp, bottom = 6.dp, end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .weight(1f)
+                    .padding(vertical = 2.dp, horizontal = 2.dp)
             ) {
-                // Expand/collapse icon
-                if (hasChildren) {
-                    IconButton(
-                        onClick = { onExpandToggle(tag.id) },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isExpanded) Icons.Default.ArrowDropDown else Icons.Default.ArrowRight,
-                            contentDescription = if (isExpanded) "Collapse" else "Expand",
-                            modifier = Modifier.size(18.dp)
-                        )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onTagToggle(tag.id, !isSelected) }
+                        .padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Expand/collapse icon
+                    if (hasChildren) {
+                        IconButton(
+                            onClick = { onExpandToggle(tag.id) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = if (isExpanded) Icons.Default.ArrowDropDown else Icons.Default.ArrowRight,
+                                contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                modifier = Modifier.size(20.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else {
+                        Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Folder,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.outline
+                            )
+                        }
                     }
-                } else {
-                    Spacer(modifier = Modifier.size(24.dp))
+
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { checked -> onTagToggle(tag.id, checked) }
+                    )
+
+                    Spacer(modifier = Modifier.width(4.dp))
+
+                    val selectedDescendants = getSelectedDescendantsCount(tag.id)
+                    val labelText = if (selectedDescendants > 0 && !isExpanded) {
+                        "${tag.name} ($selectedDescendants)"
+                    } else {
+                        tag.name
+                    }
+
+                    Text(
+                        text = labelText,
+                        style = if (depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                    )
                 }
-
-                Checkbox(
-                    checked = isSelected,
-                    onCheckedChange = { checked -> onTagToggle(tag.id, checked) }
-                )
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                val selectedDescendants = getSelectedDescendantsCount(tag.id)
-                val labelText = if (selectedDescendants > 0 && !isExpanded) {
-                    "${tag.name} ($selectedDescendants)"
-                } else {
-                    tag.name
-                }
-
-                Text(
-                    text = labelText,
-                    style = if (depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                )
             }
         }
 

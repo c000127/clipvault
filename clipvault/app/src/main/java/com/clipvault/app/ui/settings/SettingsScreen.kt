@@ -3,6 +3,9 @@ package com.clipvault.app.ui.settings
 import android.net.Uri
 import android.app.Activity
 import com.clipvault.app.ui.theme.ThemeMode
+import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
+import com.clipvault.app.ui.theme.PillShape
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -209,13 +212,13 @@ fun SettingsScreen(
             var showThemeDialog by remember { mutableStateOf(false) }
 
             // Group 1: Appearance Settings Card
-            Card(
+            ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.cardColors(
+                shape = BentoAsymmetricCardShape,
+                colors = CardDefaults.elevatedCardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -249,13 +252,13 @@ fun SettingsScreen(
             }
 
             // Group 2: Smart Features Settings Card (AI)
-            Card(
+            ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.cardColors(
+                shape = BentoAsymmetricCardShape,
+                colors = CardDefaults.elevatedCardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -274,13 +277,13 @@ fun SettingsScreen(
             }
 
             // Group 3: Data Backup Settings Card
-            Card(
+            ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.cardColors(
+                shape = BentoAsymmetricCardShape,
+                colors = CardDefaults.elevatedCardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
@@ -323,13 +326,13 @@ fun SettingsScreen(
             }
 
             // Group 4: About Card
-            Card(
+            ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large,
-                colors = CardDefaults.cardColors(
+                shape = BentoAsymmetricCardShape,
+                colors = CardDefaults.elevatedCardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
             ) {
                 Column(
                     modifier = Modifier
