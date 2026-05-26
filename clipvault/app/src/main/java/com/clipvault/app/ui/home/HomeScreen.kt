@@ -6,8 +6,11 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -215,14 +218,14 @@ fun HomeScreen(
                 }
             }
 
-            // Search bar (flat container, beautifully integrated)
+            // Search bar (pill container)
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp), // 移除左右 padding
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp), // 直角，与背景融合
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shadowElevation = 0.dp // 移除阴影
+                shadowElevation = 0.dp
             ) {
                 androidx.compose.material3.OutlinedTextField(
                     value = searchQuery,
@@ -238,9 +241,10 @@ fun HomeScreen(
                         }
                     },
                     singleLine = true,
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(0.dp), // 直角
+                    textStyle = MaterialTheme.typography.bodyLarge,
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
                     colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent, // 无边框
+                        focusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
                         unfocusedBorderColor = androidx.compose.ui.graphics.Color.Transparent,
                         focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
                         unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
@@ -379,18 +383,6 @@ private fun ClipCard(
     isSelected: Boolean
 ) {
     val dateFormat = remember { SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()) }
-    var isPressed by remember { mutableStateOf(false) }
-    
-    // spring scale feedback on touch/click
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "scale"
-    )
-
     with(sharedTransitionScope) {
         Card(
             modifier = Modifier
@@ -399,27 +391,16 @@ private fun ClipCard(
                     sharedContentState = rememberSharedContentState(key = "clip_${item.id}"),
                     animatedVisibilityScope = animatedVisibilityScope,
                     boundsTransform = { _, _ ->
-                        spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessLow
+                        tween(
+                            durationMillis = 300,
+                            easing = FastOutSlowInEasing
                         )
                     }
                 )
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
-                .pointerInput(item.id) {
-                    detectTapGestures(
-                        onPress = {
-                            isPressed = true
-                            tryAwaitRelease()
-                            isPressed = false
-                        },
-                        onTap = { onClick() },
-                        onLongPress = { onLongClick() }
-                    )
-                },
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick
+                ),
             colors = CardDefaults.cardColors(
                 containerColor = if (isSelected)
                     MaterialTheme.colorScheme.primaryContainer

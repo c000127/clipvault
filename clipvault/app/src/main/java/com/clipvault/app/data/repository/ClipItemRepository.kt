@@ -110,4 +110,12 @@ class ClipItemRepository @Inject constructor(
         itemTagDao.deleteByItemId(itemId)
         itemTagDao.insertAll(tagIds.map { ItemTag(itemId = itemId, tagId = it) })
     }
+
+    suspend fun clearAttachmentsForItem(itemId: Long) {
+        contentAttachmentDao.deleteByItemId(itemId)
+    }
+
+    suspend fun insertAttachment(attachment: ContentAttachment): Long {
+        return contentAttachmentDao.insert(attachment)
+    }
 }

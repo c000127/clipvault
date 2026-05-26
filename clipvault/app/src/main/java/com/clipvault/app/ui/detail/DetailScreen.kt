@@ -33,6 +33,11 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Button
@@ -79,6 +84,10 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
@@ -102,8 +111,19 @@ fun DetailScreen(
     val playingUri by viewModel.playingUri.collectAsState()
     val isEditing by viewModel.isEditing.collectAsState()
     val editContent by viewModel.editContent.collectAsState()
+    val editAttachments by viewModel.editAttachments.collectAsState()
+    val editSourceApp by viewModel.editSourceApp.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    val pickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            val mimeType = context.contentResolver.getType(it)
+            viewModel.addAttachmentToEdit(it, mimeType)
+        }
+    }
  
     var showAiResultSheet by remember { mutableStateOf(false) }
     var showTagEditSheet by remember { mutableStateOf(false) }
@@ -373,39 +393,9 @@ fun DetailScreen(
                 ),
                 navigationIcon = {
                     IconButton(
-                        onClick = onBack,
-                        enabled = isFullyVisible
+                        onClick = onBack
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    if (isEditing) {
-                        IconButton(
-                            onClick = { viewModel.saveEdit() },
-                            enabled = isFullyVisible
-                        ) {
-                            Icon(Icons.Default.Check, contentDescription = "Save")
-                        }
-                        IconButton(
-                            onClick = { viewModel.cancelEdit() },
-                            enabled = isFullyVisible
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "Cancel")
-                        }
-                    } else {
-                        IconButton(
-                            onClick = { viewModel.startEdit() },
-                            enabled = isFullyVisible
-                        ) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit")
-                        }
-                        IconButton(
-                            onClick = { showDeleteDialog = true },
-                            enabled = isFullyVisible
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete")
-                        }
                     }
                 }
             )
@@ -423,9 +413,9 @@ fun DetailScreen(
                             sharedContentState = rememberSharedContentState(key = "clip_${clipItem.id}"),
                             animatedVisibilityScope = animatedVisibilityScope,
                             boundsTransform = { _, _ ->
-                                spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessLow
+                                tween(
+                                    durationMillis = 300,
+                                    easing = FastOutSlowInEasing
                                 )
                             }
                         )
@@ -443,6 +433,23 @@ fun DetailScreen(
                             elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Content",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    if (!isEditing) {
+                                        IconButton(onClick = { viewModel.startEdit() }) {
+                                            Icon(Icons.Default.Edit, contentDescription = "Edit Content")
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
                                 if (isEditing) {
                                     OutlinedTextField(
                                         value = editContent,
@@ -450,7 +457,16 @@ fun DetailScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(200.dp),
-                                        label = { Text("Content") },
+                                        placeholder = { Text("Write content here...") },
+                                        shape = RoundedCornerShape(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    OutlinedTextField(
+                                        value = editSourceApp,
+                                        onValueChange = { viewModel.updateEditSourceApp(it) },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        label = { Text("Source App") },
+                                        singleLine = true,
                                         shape = RoundedCornerShape(16.dp)
                                     )
                                 } else {
@@ -486,141 +502,106 @@ fun DetailScreen(
                         }
                     }
 
-                    // Card 3a: Image Attachments (each gets its own massive, full-bleed elevated card to maximize screen width and scale adaptively)
-                    val (imageAttachments, otherAttachments) = remember(clipItem.attachments) {
-                        clipItem.attachments.partition { it.type == "image" }
-                    }
-
-                    imageAttachments.forEach { attachment ->
-                        var aspectRatio by remember(attachment.filePath) { mutableStateOf<Float?>(null) }
-                        Column(
+                    if (isEditing) {
+                        ElevatedCard(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(
-                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .padding(12.dp)
+                                .padding(vertical = 6.dp),
+                            shape = BentoAsymmetricCardShape,
+                            colors = CardDefaults.elevatedCardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                            ),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
                         ) {
-                            val imageModifier = if (aspectRatio != null) {
-                                Modifier
-                                    .fillMaxWidth()
-                                    .aspectRatio(aspectRatio!!)
-                                    .clip(MaterialTheme.shapes.large)
-                            } else {
-                                Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(min = 180.dp)
-                                    .clip(MaterialTheme.shapes.large)
-                            }
-
-                            AsyncImage(
-                                model = attachment.filePath,
-                                contentDescription = "Image attachment",
-                                modifier = imageModifier,
-                                onSuccess = { state ->
-                                    val size = state.painter.intrinsicSize
-                                    if (size.width > 0 && size.height > 0) {
-                                        aspectRatio = size.width / size.height
-                                    }
-                                },
-                                contentScale = ContentScale.FillWidth
-                            )
-                        }
-                        androidx.compose.material3.HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            thickness = 0.5.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant
-                        )
-                    }
-
-                    // Card 3b: Other Attachments (media, link, file)
-                    if (otherAttachments.isNotEmpty()) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .padding(12.dp)
-                        ) {
-                            Column(modifier = Modifier.padding(4.dp)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
-                                    text = "Attachments & Links",
+                                    text = "Edit Attachments",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.padding(bottom = 12.dp)
                                 )
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    otherAttachments.forEach { attachment ->
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(
-                                                    color = androidx.compose.ui.graphics.Color.Transparent,
-                                                    shape = RoundedCornerShape(12.dp)
-                                                )
-                                                .padding(vertical = 4.dp)
-                                        ) {
-                                            when (attachment.type) {
-                                                "media" -> {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                                            Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                                            Spacer(modifier = Modifier.width(8.dp))
-                                                            Text(
-                                                                text = attachment.filePath.substringAfterLast('/'),
-                                                                style = MaterialTheme.typography.bodyMedium,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis
-                                                            )
-                                                        }
-                                                        Button(
-                                                            onClick = { viewModel.playMedia(attachment.filePath) },
-                                                            shape = PillShape
-                                                        ) {
-                                                            Text("Play")
-                                                        }
-                                                    }
-                                                }
-                                                "link" -> {
-                                                    LinkContent(
-                                                        url = attachment.filePath,
-                                                        fetchedContent = clipItem.fetchedContent,
-                                                        fetchState = fetchState,
-                                                        onFetch = { viewModel.fetchLinkContent(attachment.filePath) },
-                                                        onOpenBrowser = {
-                                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(attachment.filePath))
-                                                            context.startActivity(intent)
-                                                        }
+                                if (editAttachments.isEmpty()) {
+                                    Text(
+                                        text = "No attachments",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        editAttachments.forEachIndexed { index, attachment ->
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(
+                                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                                        shape = RoundedCornerShape(12.dp)
+                                                    )
+                                                    .padding(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                if (attachment.type == "image") {
+                                                    AsyncImage(
+                                                        model = attachment.filePath,
+                                                        modifier = Modifier
+                                                            .size(48.dp)
+                                                            .clip(RoundedCornerShape(8.dp)),
+                                                        contentDescription = null,
+                                                        contentScale = ContentScale.Crop
+                                                    )
+                                                } else {
+                                                    Icon(
+                                                        imageVector = Icons.Default.AttachFile,
+                                                        contentDescription = null,
+                                                        modifier = Modifier.size(48.dp)
                                                     )
                                                 }
-                                                else -> {
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                                        verticalAlignment = Alignment.CenterVertically
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = attachment.filePath.substringAfterLast('/'),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    modifier = Modifier.weight(1f),
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                // Reorder buttons
+                                                if (index > 0) {
+                                                    IconButton(
+                                                        onClick = { viewModel.reorderAttachment(index, index - 1) },
+                                                        modifier = Modifier.size(24.dp)
                                                     ) {
-                                                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                                                            Icon(Icons.Default.Save, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                                            Spacer(modifier = Modifier.width(8.dp))
-                                                            Text(
-                                                                text = attachment.filePath.substringAfterLast('/'),
-                                                                style = MaterialTheme.typography.bodyMedium,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis
-                                                            )
-                                                        }
+                                                        Icon(Icons.Default.ArrowUpward, contentDescription = "Move Up", modifier = Modifier.size(16.dp))
                                                     }
+                                                }
+                                                if (index < editAttachments.size - 1) {
+                                                    IconButton(
+                                                        onClick = { viewModel.reorderAttachment(index, index + 1) },
+                                                        modifier = Modifier.size(24.dp)
+                                                    ) {
+                                                        Icon(Icons.Default.ArrowDownward, contentDescription = "Move Down", modifier = Modifier.size(16.dp))
+                                                    }
+                                                }
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                // Delete button
+                                                IconButton(
+                                                    onClick = { viewModel.removeAttachmentFromEdit(attachment.id) },
+                                                    modifier = Modifier.size(24.dp)
+                                                ) {
+                                                    Icon(Icons.Default.Close, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
                                                 }
                                             }
                                         }
                                     }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                OutlinedButton(
+                                    onClick = { pickerLauncher.launch("*/*") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = PillShape
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Add Attachment")
                                 }
                             }
                         }
@@ -629,37 +610,224 @@ fun DetailScreen(
                             thickness = 0.5.dp,
                             color = MaterialTheme.colorScheme.outlineVariant
                         )
+                    } else {
+                        // Card 3a: Image Attachments (each gets its own massive, full-bleed elevated card to maximize screen width and scale adaptively)
+                        val (imageAttachments, otherAttachments) = remember(clipItem.attachments) {
+                            clipItem.attachments.partition { it.type == "image" }
+                        }
+
+                        imageAttachments.forEach { attachment ->
+                            var aspectRatio by remember(attachment.filePath) { mutableStateOf<Float?>(null) }
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(12.dp)
+                            ) {
+                                val imageModifier = if (aspectRatio != null) {
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(aspectRatio!!)
+                                        .clip(MaterialTheme.shapes.large)
+                                } else {
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(min = 180.dp)
+                                        .clip(MaterialTheme.shapes.large)
+                                }
+
+                                AsyncImage(
+                                    model = attachment.filePath,
+                                    contentDescription = "Image attachment",
+                                    modifier = imageModifier,
+                                    onSuccess = { state ->
+                                        val size = state.painter.intrinsicSize
+                                        if (size.width > 0 && size.height > 0) {
+                                            aspectRatio = size.width / size.height
+                                        }
+                                    },
+                                    contentScale = ContentScale.FillWidth
+                                )
+                            }
+                            androidx.compose.material3.HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant
+                            )
+                        }
+
+                        // Card 3b: Other Attachments (media, link, file)
+                        if (otherAttachments.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .padding(12.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(4.dp)) {
+                                    Text(
+                                        text = "Attachments & Links",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(bottom = 12.dp)
+                                    )
+                                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                        otherAttachments.forEach { attachment ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(
+                                                        color = androidx.compose.ui.graphics.Color.Transparent,
+                                                        shape = RoundedCornerShape(12.dp)
+                                                    )
+                                                    .padding(vertical = 4.dp)
+                                            ) {
+                                                when (attachment.type) {
+                                                    "media" -> {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                                Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                                                Spacer(modifier = Modifier.width(8.dp))
+                                                                Text(
+                                                                    text = attachment.filePath.substringAfterLast('/'),
+                                                                    style = MaterialTheme.typography.bodyMedium,
+                                                                    maxLines = 1,
+                                                                    overflow = TextOverflow.Ellipsis
+                                                                )
+                                                            }
+                                                            Button(
+                                                                onClick = { viewModel.playMedia(attachment.filePath) },
+                                                                shape = PillShape
+                                                            ) {
+                                                                Text("Play")
+                                                            }
+                                                        }
+                                                    }
+                                                    "link" -> {
+                                                        LinkContent(
+                                                            url = attachment.filePath,
+                                                            fetchedContent = clipItem.fetchedContent,
+                                                            fetchState = fetchState,
+                                                            onFetch = { viewModel.fetchLinkContent(attachment.filePath) },
+                                                            onOpenBrowser = {
+                                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(attachment.filePath))
+                                                                context.startActivity(intent)
+                                                            }
+                                                        )
+                                                    }
+                                                    else -> {
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                                                Icon(Icons.Default.Save, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                                                Spacer(modifier = Modifier.width(8.dp))
+                                                                Text(
+                                                                    text = attachment.filePath.substringAfterLast('/'),
+                                                                    style = MaterialTheme.typography.bodyMedium,
+                                                                    maxLines = 1,
+                                                                    overflow = TextOverflow.Ellipsis
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            androidx.compose.material3.HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                thickness = 0.5.dp,
+                                color = MaterialTheme.colorScheme.outlineVariant
+                            )
+                        }
                     }
 
-                    // Card 4: AI Analysis Action Card (styled as a primary-tonal container flat Card)
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth(),
-                        shape = PillShape,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
+                    if (isEditing) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { viewModel.analyzeContent() }
-                                .padding(vertical = 14.dp, horizontal = 24.dp),
-                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.cancelEdit() },
+                                modifier = Modifier.weight(1f),
+                                shape = PillShape
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Cancel")
+                            }
+                            Button(
+                                onClick = { viewModel.saveEdit() },
+                                modifier = Modifier.weight(1f),
+                                shape = PillShape
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Save")
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "AI 智能分析",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                            Card(
+                                modifier = Modifier.weight(1f),
+                                shape = PillShape,
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                                ),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { viewModel.analyzeContent() }
+                                        .padding(vertical = 12.dp, horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "AI 智能分析",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = { showDeleteDialog = true },
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                ),
+                                shape = PillShape
+                             ) {
+                                 Icon(Icons.Default.Delete, contentDescription = null)
+                                 Spacer(modifier = Modifier.width(4.dp))
+                                 Text("Delete")
+                             }
                         }
                     }
 

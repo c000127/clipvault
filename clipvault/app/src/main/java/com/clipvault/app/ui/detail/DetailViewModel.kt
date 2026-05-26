@@ -10,8 +10,12 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.clipvault.app.data.local.entity.ClipItem
 import com.clipvault.app.data.local.AppDatabase
 import com.clipvault.app.data.local.entity.Tag
+import com.clipvault.app.data.local.entity.ContentAttachment
 import com.clipvault.app.data.repository.ClipItemRepository
 import com.clipvault.app.data.repository.TagRepository
+import android.net.Uri
+import java.io.File
+import java.util.UUID
 import dagger.hilt.android.lifecycle.HiltViewModel
 import androidx.room.withTransaction
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -211,8 +215,17 @@ class DetailViewModel @Inject constructor(
         exoPlayer.pause()
     }
  
+    private val _editAttachments = MutableStateFlow<List<ContentAttachment>>(emptyList())
+    val editAttachments: StateFlow<List<ContentAttachment>> = _editAttachments.asStateFlow()
+
+    private val _editSourceApp = MutableStateFlow("")
+    val editSourceApp: StateFlow<String> = _editSourceApp.asStateFlow()
+
     fun startEdit() {
-        _editContent.value = _item.value?.content ?: ""
+        val item = _item.value ?: return
+        _editContent.value = item.content
+        _editAttachments.value = item.attachments.toList()
+        _editSourceApp.value = item.sourceApp
         _isEditing.value = true
     }
 
@@ -224,13 +237,95 @@ class DetailViewModel @Inject constructor(
         _editContent.value = text
     }
 
+    fun updateEditSourceApp(text: String) {
+        _editSourceApp.value = text
+    }
+
+    fun addAttachmentToEdit(uri: Uri, mimeType: String?) {
+        viewModelScope.launch {
+            try {
+                val filePath = copyUriToPrivateStorage(uri, mimeType)
+                val type = when {
+                    mimeType?.startsWith("image/") == true -> "image"
+                    mimeType?.startsWith("video/") == true -> "media"
+                    else -> "file"
+                }
+                val newAttachment = ContentAttachment(
+                    id = -System.currentTimeMillis(), // Unique temporary negative ID
+                    itemId = itemId,
+                    type = type,
+                    filePath = filePath,
+                    thumbnailPath = if (type == "image") filePath else "",
+                    orderIndex = _editAttachments.value.size
+                )
+                _editAttachments.value = _editAttachments.value + newAttachment
+            } catch (e: Exception) {
+                android.util.Log.e("DetailVM", "Failed to add attachment to edit", e)
+            }
+        }
+    }
+
+    private suspend fun copyUriToPrivateStorage(uri: Uri, mimeType: String?): String {
+        return withContext(Dispatchers.IO) {
+            val clipsDir = File(context.filesDir, "clips")
+            if (!clipsDir.exists()) clipsDir.mkdirs()
+            val ext = getExtensionFromMimeType(mimeType) ?: "bin"
+            val fileName = "${System.currentTimeMillis()}_${UUID.randomUUID()}.$ext"
+            val destFile = File(clipsDir, fileName)
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                destFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            destFile.absolutePath
+        }
+    }
+
+    private fun getExtensionFromMimeType(mimeType: String?): String? {
+        return when (mimeType) {
+            "image/jpeg" -> "jpg"
+            "image/png" -> "png"
+            "image/gif" -> "gif"
+            "image/webp" -> "webp"
+            "video/mp4" -> "mp4"
+            "video/webm" -> "webm"
+            "audio/mpeg" -> "mp3"
+            "audio/ogg" -> "ogg"
+            "audio/wav" -> "wav"
+            else -> null
+        }
+    }
+
+    fun removeAttachmentFromEdit(attachmentId: Long) {
+        _editAttachments.value = _editAttachments.value.filter { it.id != attachmentId }
+    }
+
+    fun reorderAttachment(fromIndex: Int, toIndex: Int) {
+        val list = _editAttachments.value.toMutableList()
+        if (fromIndex in list.indices && toIndex in list.indices) {
+            val item = list.removeAt(fromIndex)
+            list.add(toIndex, item)
+            _editAttachments.value = list
+        }
+    }
+
     fun saveEdit() {
         val currentItem = _item.value ?: return
         viewModelScope.launch {
-            clipItemRepository.update(currentItem.copy(
-                content = _editContent.value,
-                updatedAt = System.currentTimeMillis()
-            ))
+            database.withTransaction {
+                clipItemRepository.update(currentItem.copy(
+                    content = _editContent.value,
+                    sourceApp = _editSourceApp.value,
+                    thumbnailPath = _editAttachments.value.firstOrNull { it.type == "image" }?.filePath
+                        ?: "",
+                    updatedAt = System.currentTimeMillis()
+                ))
+                // Clear old attachments and save new/modified ones
+                clipItemRepository.clearAttachmentsForItem(itemId)
+                _editAttachments.value.forEachIndexed { idx, att ->
+                    clipItemRepository.insertAttachment(
+                        att.copy(id = 0, itemId = itemId, orderIndex = idx)
+                    )
+                }
+            }
             _isEditing.value = false
             loadItem()
         }

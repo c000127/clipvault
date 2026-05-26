@@ -7,6 +7,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ArrowRight
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -31,7 +32,12 @@ fun TagTreeSelector(
     onTagToggle: (tagId: Long, selected: Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Build parent->children map
+    var searchQuery by remember { mutableStateOf("") }
+    
+    // Track expanded status
+    val expandedIds = remember { mutableStateMapOf<Long, Boolean>() }
+
+    // Build children mapping
     val childrenMap = remember(allTags) {
         val map = mutableMapOf<Long?, MutableList<Tag>>()
         allTags.forEach { tag ->
@@ -40,32 +46,77 @@ fun TagTreeSelector(
         map
     }
 
-    // Track which tags are expanded
-    val expandedIds = remember { mutableStateOf(setOf<Long>()) }
+    // Helper to check if a tag matches search or has any descendant matching search
+    fun matchesSearch(tag: Tag): Boolean {
+        if (searchQuery.isBlank()) return true
+        if (tag.name.contains(searchQuery, ignoreCase = true)) return true
+        val children = childrenMap[tag.id] ?: emptyList()
+        return children.any { matchesSearch(it) }
+    }
+
+    // Helper to get total selected descendants count
+    fun getSelectedDescendantsCount(tagId: Long): Int {
+        val children = childrenMap[tagId] ?: emptyList()
+        var count = 0
+        children.forEach { child ->
+            if (selectedTagIds.contains(child.id)) {
+                count++
+            }
+            count += getSelectedDescendantsCount(child.id)
+        }
+        return count
+    }
+
+    // Helper to check if any child is selected (for parent highlighting)
+    fun isAnyDescendantSelected(tagId: Long): Boolean {
+        val children = childrenMap[tagId] ?: emptyList()
+        return children.any { child ->
+            selectedTagIds.contains(child.id) || isAnyDescendantSelected(child.id)
+        }
+    }
 
     Column(
-        modifier = modifier
-            .fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        // Render top-level tags (parentId == null)
+        // Search bar inside selector
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Search tags...") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            singleLine = true,
+            leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Search, contentDescription = null) },
+            shape = MaterialTheme.shapes.medium
+        )
+
         val rootTags = childrenMap[null] ?: emptyList()
-        rootTags.forEach { tag ->
-            TagTreeNode(
-                tag = tag,
-                childrenMap = childrenMap,
-                selectedTagIds = selectedTagIds,
-                expandedIds = expandedIds.value,
-                onExpandToggle = { tagId ->
-                    expandedIds.value = if (expandedIds.value.contains(tagId)) {
-                        expandedIds.value - tagId
-                    } else {
-                        expandedIds.value + tagId
-                    }
-                },
-                onTagToggle = onTagToggle,
-                depth = 0
-            )
+        val filteredRootTags = remember(rootTags, searchQuery) {
+            rootTags.filter { matchesSearch(it) }
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            filteredRootTags.forEach { tag ->
+                TagTreeNode(
+                    tag = tag,
+                    childrenMap = childrenMap,
+                    selectedTagIds = selectedTagIds,
+                    expandedIds = expandedIds,
+                    onExpandToggle = { tagId ->
+                        expandedIds[tagId] = !(expandedIds[tagId] ?: false)
+                    },
+                    onTagToggle = onTagToggle,
+                    getSelectedDescendantsCount = ::getSelectedDescendantsCount,
+                    isAnyDescendantSelected = ::isAnyDescendantSelected,
+                    matchesSearch = ::matchesSearch,
+                    depth = 0
+                )
+            }
         }
     }
 }
@@ -75,67 +126,97 @@ private fun TagTreeNode(
     tag: Tag,
     childrenMap: Map<Long?, List<Tag>>,
     selectedTagIds: Set<Long>,
-    expandedIds: Set<Long>,
+    expandedIds: androidx.compose.runtime.snapshots.SnapshotStateMap<Long, Boolean>,
     onExpandToggle: (Long) -> Unit,
     onTagToggle: (tagId: Long, selected: Boolean) -> Unit,
+    getSelectedDescendantsCount: (Long) -> Int,
+    isAnyDescendantSelected: (Long) -> Boolean,
+    matchesSearch: (Tag) -> Boolean,
     depth: Int
 ) {
     val children = childrenMap[tag.id] ?: emptyList()
-    val hasChildren = children.isNotEmpty()
-    val isExpanded = expandedIds.contains(tag.id)
+    val filteredChildren = children.filter { matchesSearch(it) }
+    val hasChildren = filteredChildren.isNotEmpty()
+    val isExpanded = expandedIds[tag.id] ?: false
     val isSelected = selectedTagIds.contains(tag.id)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onTagToggle(tag.id, !isSelected) }
-            .padding(start = (depth * 16).dp, top = 4.dp, bottom = 4.dp, end = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Expand/collapse icon
-        if (hasChildren) {
-            IconButton(
-                onClick = { onExpandToggle(tag.id) },
-                modifier = Modifier.size(24.dp)
-            ) {
-                Icon(
-                    imageVector = if (isExpanded) Icons.Default.ArrowDropDown else Icons.Default.ArrowRight,
-                    contentDescription = if (isExpanded) "Collapse" else "Expand",
-                    modifier = Modifier.size(18.dp)
-                )
-            }
-        } else {
-            Spacer(modifier = Modifier.size(24.dp))
-        }
-
-        Checkbox(
-            checked = isSelected,
-            onCheckedChange = { checked -> onTagToggle(tag.id, checked) }
-        )
-
-        Spacer(modifier = Modifier.width(8.dp))
-
-        Text(
-            text = tag.name,
-            style = if (depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-        )
+    
+    // Parent highlight background if descendant is selected
+    val isParentHighlighted = !isSelected && isAnyDescendantSelected(tag.id)
+    val backgroundColor = when {
+        isSelected -> MaterialTheme.colorScheme.primaryContainer
+        isParentHighlighted -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.4f)
+        else -> androidx.compose.ui.graphics.Color.Transparent
     }
 
-    // Render children if expanded
-    if (hasChildren && isExpanded) {
-        children.forEach { child ->
-            TagTreeNode(
-                tag = child,
-                childrenMap = childrenMap,
-                selectedTagIds = selectedTagIds,
-                expandedIds = expandedIds,
-                onExpandToggle = onExpandToggle,
-                onTagToggle = onTagToggle,
-                depth = depth + 1
-            )
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            color = backgroundColor,
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onTagToggle(tag.id, !isSelected) }
+                    .padding(start = (depth * 16).dp, top = 6.dp, bottom = 6.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Expand/collapse icon
+                if (hasChildren) {
+                    IconButton(
+                        onClick = { onExpandToggle(tag.id) },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ArrowDropDown else Icons.Default.ArrowRight,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                } else {
+                    Spacer(modifier = Modifier.size(24.dp))
+                }
+
+                Checkbox(
+                    checked = isSelected,
+                    onCheckedChange = { checked -> onTagToggle(tag.id, checked) }
+                )
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                val selectedDescendants = getSelectedDescendantsCount(tag.id)
+                val labelText = if (selectedDescendants > 0 && !isExpanded) {
+                    "${tag.name} ($selectedDescendants)"
+                } else {
+                    tag.name
+                }
+
+                Text(
+                    text = labelText,
+                    style = if (depth == 0) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // Render children if expanded
+        if (hasChildren && isExpanded) {
+            filteredChildren.forEach { child ->
+                TagTreeNode(
+                    tag = child,
+                    childrenMap = childrenMap,
+                    selectedTagIds = selectedTagIds,
+                    expandedIds = expandedIds,
+                    onExpandToggle = onExpandToggle,
+                    onTagToggle = onTagToggle,
+                    getSelectedDescendantsCount = getSelectedDescendantsCount,
+                    isAnyDescendantSelected = isAnyDescendantSelected,
+                    matchesSearch = matchesSearch,
+                    depth = depth + 1
+                )
+            }
         }
     }
 }
