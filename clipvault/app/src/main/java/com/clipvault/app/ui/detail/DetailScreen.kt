@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -166,24 +167,6 @@ fun DetailScreen(
         }
     }
 
-    // AI Analysis status dialog overlays
-    if (aiState is AiState.Loading) {
-        androidx.compose.ui.window.Dialog(onDismissRequest = {}) {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    CircularProgressIndicator()
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("AI 分析中...", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
-    }
 
     if (aiState is AiState.Error) {
         val errorMsg = (aiState as AiState.Error).message
@@ -784,28 +767,52 @@ fun DetailScreen(
                                 modifier = Modifier.weight(1f),
                                 shape = PillShape,
                                 colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                                    containerColor = if (aiState is AiState.Loading)
+                                        MaterialTheme.colorScheme.surfaceContainerHigh
+                                    else
+                                        MaterialTheme.colorScheme.primaryContainer
                                 ),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                             ) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { viewModel.analyzeContent() }
+                                        .clickable(enabled = aiState !is AiState.Loading) {
+                                            if (clipItem.aiSummary.isNotBlank()) {
+                                                viewModel.regenerateAiSummary()
+                                            } else {
+                                                viewModel.analyzeContent()
+                                            }
+                                        }
                                         .padding(vertical = 12.dp, horizontal = 16.dp),
                                     horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        Icons.Default.AutoAwesome,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
+                                    if (aiState is AiState.Loading) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    } else {
+                                        Icon(
+                                            Icons.Default.AutoAwesome,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "AI 智能分析",
+                                        text = when {
+                                            aiState is AiState.Loading -> "分析中..."
+                                            clipItem.aiSummary.isNotBlank() -> "重新生成"
+                                            else -> "AI 智能分析"
+                                        },
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        color = if (aiState is AiState.Loading)
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        else
+                                            MaterialTheme.colorScheme.onPrimaryContainer
                                     )
                                 }
                             }
@@ -829,6 +836,74 @@ fun DetailScreen(
                         thickness = 0.5.dp,
                         color = MaterialTheme.colorScheme.outlineVariant
                     )
+
+                    // AI Summary Section — shown only when aiSummary is non-blank
+                    if (clipItem.aiSummary.isNotBlank()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.3f),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.AutoAwesome,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        "AI 总结",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    )
+                                }
+                                Row {
+                                    // 重新生成按钮
+                                    IconButton(
+                                        onClick = { viewModel.regenerateAiSummary() },
+                                        enabled = aiState !is AiState.Loading,
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Refresh,
+                                            contentDescription = "重新生成",
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.tertiary
+                                        )
+                                    }
+                                    // 删除总结按钮
+                                    IconButton(
+                                        onClick = { viewModel.deleteAiSummary() },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "删除总结",
+                                            modifier = Modifier.size(18.dp),
+                                            tint = MaterialTheme.colorScheme.error
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = clipItem.aiSummary,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
 
                     // Card 5: Tags & Metadata Section (grouped, flat container Column)
                     Column(

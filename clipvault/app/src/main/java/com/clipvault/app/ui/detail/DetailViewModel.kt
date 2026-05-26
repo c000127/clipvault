@@ -381,17 +381,25 @@ class DetailViewModel @Inject constructor(
     fun applyAiResult(summary: String, selectedTags: List<String>) {
         val currentItem = _item.value ?: return
         viewModelScope.launch {
-            val currentContent = currentItem.content
-            val updatedContent = if (currentContent.isBlank()) {
-                "---\n🤖 AI 总结:\n$summary"
-            } else {
-                "$currentContent\n\n---\n🤖 AI 总结:\n$summary"
-            }
- 
             database.withTransaction {
-                clipItemRepository.update(currentItem.copy(content = updatedContent, updatedAt = System.currentTimeMillis()))
- 
-                // Associate tags
+                // 保存到 aiSummary 字段，保留历史记录
+                val history = try {
+                    val list = com.google.gson.Gson().fromJson(
+                        currentItem.aiSummaryHistory, Array<String>::class.java
+                    ).toMutableList()
+                    if (currentItem.aiSummary.isNotBlank()) list.add(currentItem.aiSummary)
+                    list
+                } catch (e: Exception) {
+                    mutableListOf(currentItem.aiSummary).filter { it.isNotBlank() }
+                }
+
+                clipItemRepository.update(currentItem.copy(
+                    aiSummary = summary,
+                    aiSummaryHistory = com.google.gson.Gson().toJson(history),
+                    updatedAt = System.currentTimeMillis()
+                ))
+
+                // 关联 tag（与原逻辑相同）
                 val existingTags = tagRepository.getAllTagsOnce().toMutableList()
                 for (tagName in selectedTags) {
                     val tagId = getOrCreateTagHierarchy(tagName, existingTags)
@@ -403,7 +411,30 @@ class DetailViewModel @Inject constructor(
             loadItem()
         }
     }
- 
+
+    fun regenerateAiSummary() {
+        // 先清除当前总结，再重新分析
+        val currentItem = _item.value ?: return
+        viewModelScope.launch {
+            clipItemRepository.update(currentItem.copy(
+                aiSummary = "",
+                updatedAt = System.currentTimeMillis()
+            ))
+            loadItem()
+            analyzeContent()
+        }
+    }
+
+    fun deleteAiSummary() {
+        val currentItem = _item.value ?: return
+        viewModelScope.launch {
+            clipItemRepository.update(currentItem.copy(
+                aiSummary = "",
+                updatedAt = System.currentTimeMillis()
+            ))
+            loadItem()
+        }
+    }
     private suspend fun getOrCreateTagHierarchy(tagPath: String, existingTags: MutableList<Tag>): Long? {
         val segments = tagPath.split('/')
         var currentParentId: Long? = null

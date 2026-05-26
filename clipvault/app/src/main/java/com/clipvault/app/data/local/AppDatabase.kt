@@ -26,7 +26,7 @@ import com.clipvault.app.data.local.entity.ContentAttachment
         AiProvider::class,
         ContentAttachment::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -53,6 +53,7 @@ abstract class AppDatabase : RoomDatabase() {
                         "clipvault.db"
                     )
                     .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_2_3)
                     .setQueryCallback({ sql, args ->
                         android.util.Log.d("AppDB", "SQL: $sql | Args: $args")
                     }, { it.run() })
@@ -77,6 +78,15 @@ abstract class AppDatabase : RoomDatabase() {
         private fun tableExists(db: SupportSQLiteDatabase, tableName: String): Boolean {
             val cursor = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", arrayOf(tableName))
             return cursor.use { it.moveToFirst() }
+        }
+
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                android.util.Log.d("AppDB", "Starting MIGRATION_2_3...")
+                db.execSQL("ALTER TABLE `items` ADD COLUMN `aiSummary` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `items` ADD COLUMN `aiSummaryHistory` TEXT NOT NULL DEFAULT '[]'")
+                android.util.Log.d("AppDB", "MIGRATION_2_3 completed successfully.")
+            }
         }
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
