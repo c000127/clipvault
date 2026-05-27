@@ -195,3 +195,13 @@
 - Stripped the `SharedTransitionLayout` wrapping structure and related imports/parameters to maximize rendering efficiency.
 - Cleaned up unused fields (like sourceApp text inputs) from edit mode and ensured textless items (such as pure images) show proper edit triggers.
 - Passed all automated verify builds cleanly.
+
+## Task 12 — Compose First Refactoring (Compose 1.11) ✅
+- [x] **Motion System Upgrade**: Integrated `ResponsiveSpring` and `SnappySpring` for fluid, non-linear physical animations.
+- [x] **Shared Element Transitions**: Correctly configured `SharedTransitionLayout` hero animations between list cards and detail views.
+- [x] **Navigation Animation**: Replaced static `fadeIn/fadeOut` with Material 3 Expressive `slideInHorizontally` + `spring()` transitions.
+- [x] **Stability Optimization**: Verified that Strong Skipping Mode is active; confirmed no redundant `@Stable` annotations.
+- [x] **UI Testing Foundation**: Implemented `HomeScreenTest.kt` using Compose Testing v2 APIs and `StandardTestDispatcher`.
+- [x] **Preview Refinement**: Added `PreviewWrapper` in `Theme.kt` to simplify UI preview management.
+- [x] **Interaction Cleanup**: Removed `graphicsLayer` scale from cards to prevent text rendering artifacts during long-press.
+- [x] **Build Verification**: All changes passed `./gradlew assembleDebug`.

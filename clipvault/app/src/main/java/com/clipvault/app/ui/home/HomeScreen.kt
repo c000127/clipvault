@@ -476,33 +476,18 @@ private fun LazyStaggeredGridItemScope.ClipCard(
     isSelected: Boolean
 ) {
     val dateFormat = remember { SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()) }
-    var isPressed by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
-        animationSpec = ClipVaultMotion.BouncySpring,
-        label = "scale"
-    )
 
     with(sharedTransitionScope) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateItem() // 添加列表项重排动效
-                .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
-                }
                 .sharedElement(
                     rememberSharedContentState(key = "item_${item.id}"),
                     animatedVisibilityScope = animatedVisibilityScope
                 )
                 .pointerInput(Unit) {
                     detectTapGestures(
-                        onPress = {
-                            isPressed = true
-                            tryAwaitRelease()
-                            isPressed = false
-                        },
                         onTap = { onClick() },
                         onLongPress = { onLongClick() }
                     )
