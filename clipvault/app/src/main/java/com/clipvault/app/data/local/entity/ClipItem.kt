@@ -19,4 +19,7 @@ data class ClipItem(
 ) {
     @Ignore
     var attachments: List<ContentAttachment> = emptyList()
+
+    @Ignore
+    var tags: List<Tag> = emptyList()
 }

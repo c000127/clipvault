@@ -90,6 +90,7 @@ class HomeViewModel @Inject constructor(
                 pagingData.map { item ->
                     item.apply {
                         attachments = clipItemRepository.getAttachmentsForItemOnce(item.id)
+                        tags = clipItemRepository.getTagsForItemOnce(item.id)
                     }
                 }
             }
