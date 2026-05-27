@@ -3,57 +3,22 @@ package com.clipvault.app.ui.tagmanager
 import com.clipvault.app.data.local.entity.Tag
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
+import com.clipvault.app.ui.theme.ExpressiveBottomSheetShape
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.CardDefaults
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowRight
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DriveFileMove
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -69,6 +34,9 @@ fun TagManagerScreen(
     val moveDialogState by viewModel.moveDialogState.collectAsState()
     val message by viewModel.message.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    
+    var activeContextTag by remember { mutableStateOf<Tag?>(null) }
+    var showContextMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(message) {
         message?.let {
@@ -81,7 +49,7 @@ fun TagManagerScreen(
     when (val state = editDialogState) {
         is EditDialogState.Create -> {
             TagEditDialog(
-                title = "Create Tag",
+                title = if (state.parentId == null) "Create Root Tag" else "Create Sub-tag",
                 initialName = "",
                 onConfirm = { name ->
                     viewModel.createTag(name, state.parentId)
@@ -92,7 +60,7 @@ fun TagManagerScreen(
         }
         is EditDialogState.Rename -> {
             TagEditDialog(
-                title = "Rename Tag",
+                title = "Rename Identity",
                 initialName = state.tag.name,
                 onConfirm = { name ->
                     viewModel.renameTag(state.tag.id, name)
@@ -109,7 +77,6 @@ fun TagManagerScreen(
         DeleteConfirmDialog(
             tagName = deleteDialogState.tag.name,
             childCount = deleteDialogState.childCount,
-            itemCount = deleteDialogState.itemCount,
             onConfirm = { viewModel.confirmDelete(deleteDialogState.tag.id) },
             onDismiss = { viewModel.hideDeleteDialog() }
         )
@@ -119,7 +86,6 @@ fun TagManagerScreen(
     val moveState = moveDialogState
     if (moveState.tag.id != 0L && moveState != MoveDialogState.Hidden) {
         MoveTagDialog(
-            tagName = moveState.tag.name,
             availableParents = moveState.availableParents,
             onSelect = { newParentId ->
                 viewModel.moveTag(moveState.tag.id, newParentId)
@@ -128,11 +94,68 @@ fun TagManagerScreen(
         )
     }
 
+    // Context Menu Bottom Sheet (M3 Standards)
+    if (showContextMenu && activeContextTag != null) {
+        ModalBottomSheet(
+            onDismissRequest = { showContextMenu = false },
+            shape = ExpressiveBottomSheetShape,
+            dragHandle = { BottomSheetDefaults.DragHandle() }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+                    .navigationBarsPadding()
+            ) {
+                Text(
+                    text = activeContextTag?.name ?: "",
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+                
+                ListItem(
+                    headlineContent = { Text("Add Sub-tag") },
+                    leadingContent = { Icon(Icons.Default.Add, null) },
+                    modifier = Modifier.clickable { 
+                        showContextMenu = false
+                        viewModel.showCreateDialog(activeContextTag?.id) 
+                    }
+                )
+                ListItem(
+                    headlineContent = { Text("Rename") },
+                    leadingContent = { Icon(Icons.Default.Edit, null) },
+                    modifier = Modifier.clickable { 
+                        showContextMenu = false
+                        activeContextTag?.let { viewModel.showRenameDialog(it) }
+                    }
+                )
+                ListItem(
+                    headlineContent = { Text("Move to...") },
+                    leadingContent = { Icon(Icons.Default.DriveFileMove, null) },
+                    modifier = Modifier.clickable { 
+                        showContextMenu = false
+                        activeContextTag?.let { viewModel.showMoveDialog(it) }
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                ListItem(
+                    headlineContent = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                    leadingContent = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
+                    modifier = Modifier.clickable { 
+                        showContextMenu = false
+                        activeContextTag?.let { viewModel.showDeleteDialog(it) }
+                    }
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Tag Manager") },
+                title = { Text("Manage Identities") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -143,53 +166,38 @@ fun TagManagerScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { viewModel.showCreateDialog(null) },
-                shape = PillShape
+                shape = PillShape,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Tag")
+                Icon(Icons.Default.Add, contentDescription = "New Root Tag")
             }
         }
     ) { innerPadding ->
         if (tagTree.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    Icons.Default.Folder,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    "No tags yet",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    "Tap + to create your first tag",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(Icons.AutoMirrored.Filled.Label, null, modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
+                    Spacer(Modifier.height(16.dp))
+                    Text("No identities defined", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(horizontal = 16.dp)
+                    .padding(horizontal = 20.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 tagTree.forEach { node ->
                     renderTagNode(
                         node = node,
                         onToggleExpand = { viewModel.toggleExpand(it) },
-                        onAddChild = { viewModel.showCreateDialog(it) },
-                        onRename = { viewModel.showRenameDialog(it) },
-                        onDelete = { viewModel.showDeleteDialog(it) },
-                        onMove = { viewModel.showMoveDialog(it) }
+                        onShowMenu = { 
+                            activeContextTag = it
+                            showContextMenu = true
+                        }
                     )
                 }
             }
@@ -200,19 +208,13 @@ fun TagManagerScreen(
 private fun androidx.compose.foundation.lazy.LazyListScope.renderTagNode(
     node: TagNode,
     onToggleExpand: (Long) -> Unit,
-    onAddChild: (Long) -> Unit,
-    onRename: (Tag) -> Unit,
-    onDelete: (Tag) -> Unit,
-    onMove: (Tag) -> Unit
+    onShowMenu: (Tag) -> Unit
 ) {
     item(key = node.tag.id) {
         TagRow(
             node = node,
             onToggleExpand = { onToggleExpand(node.tag.id) },
-            onAddChild = { onAddChild(node.tag.id) },
-            onRename = { onRename(node.tag) },
-            onDelete = { onDelete(node.tag) },
-            onMove = { onMove(node.tag) }
+            onShowMenu = { onShowMenu(node.tag) }
         )
     }
     if (node.isExpanded) {
@@ -220,10 +222,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.renderTagNode(
             renderTagNode(
                 node = child,
                 onToggleExpand = onToggleExpand,
-                onAddChild = onAddChild,
-                onRename = onRename,
-                onDelete = onDelete,
-                onMove = onMove
+                onShowMenu = onShowMenu
             )
         }
     }
@@ -233,35 +232,21 @@ private fun androidx.compose.foundation.lazy.LazyListScope.renderTagNode(
 private fun TagRow(
     node: TagNode,
     onToggleExpand: () -> Unit,
-    onAddChild: () -> Unit,
-    onRename: () -> Unit,
-    onDelete: () -> Unit,
-    onMove: () -> Unit
+    onShowMenu: () -> Unit
 ) {
     val depth = node.depth
+    val isRoot = depth == 0
     
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = (depth * 12).dp) // Reduced base indentation to fit lines
-            .height(56.dp),
+            .padding(start = (depth * 16).dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Vertical lines for hierarchy
-        repeat(depth) { d ->
-            Box(
-                modifier = Modifier
-                    .width(16.dp)
-                    .fillMaxHeight()
-            ) {
-                // Vertical line
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .fillMaxHeight()
-                        .align(Alignment.Center)
-                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                )
+        // Hierarchy lines (minimalist)
+        if (!isRoot) {
+            Box(modifier = Modifier.width(12.dp).fillMaxHeight()) {
+                Box(modifier = Modifier.width(1.dp).fillMaxHeight().align(Alignment.Center).background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)))
             }
         }
 
@@ -271,62 +256,49 @@ private fun TagRow(
                 .padding(vertical = 4.dp, horizontal = 4.dp),
             shape = BentoAsymmetricCardShape,
             colors = CardDefaults.elevatedCardColors(
-                containerColor = if (node.children.isNotEmpty() && node.isExpanded)
-                    MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f)
-                else
-                    MaterialTheme.colorScheme.surfaceContainerLow
+                containerColor = when {
+                    isRoot -> MaterialTheme.colorScheme.surfaceContainerHigh
+                    else -> MaterialTheme.colorScheme.surfaceContainerLow
+                }
             ),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = if (isRoot) 1.dp else 0.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = onToggleExpand)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Expand/collapse icon
+                // Hierarchical Indicator
                 if (node.children.isNotEmpty()) {
                     Icon(
                         imageVector = if (node.isExpanded) Icons.Default.ArrowDropDown else Icons.Default.ArrowRight,
-                        contentDescription = if (node.isExpanded) "Collapse" else "Expand",
+                        contentDescription = null,
                         modifier = Modifier.size(24.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 } else {
                     Icon(
-                        imageVector = Icons.Default.Folder,
+                        imageVector = Icons.AutoMirrored.Filled.Label,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.outline
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-                // Tag name
                 Text(
                     text = node.tag.name,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = if (isRoot) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f),
-                    color = if (node.children.isNotEmpty() && node.isExpanded)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
-                // Action buttons
-                IconButton(onClick = onAddChild, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Add, contentDescription = "Add child", modifier = Modifier.size(18.dp))
-                }
-                IconButton(onClick = onRename, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Edit, contentDescription = "Rename", modifier = Modifier.size(18.dp))
-                }
-                IconButton(onClick = onMove, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.DriveFileMove, contentDescription = "Move", modifier = Modifier.size(18.dp))
-                }
-                IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.error)
+                // Single Contextual Menu Access (Prevents visual overload)
+                IconButton(onClick = onShowMenu, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Menu", modifier = Modifier.size(20.dp))
                 }
             }
         }
@@ -349,8 +321,9 @@ private fun TagEditDialog(
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
-                label = { Text("Tag name") },
+                label = { Text("Identity Name") },
                 singleLine = true,
+                shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth()
             )
         },
@@ -374,42 +347,35 @@ private fun TagEditDialog(
 private fun DeleteConfirmDialog(
     tagName: String,
     childCount: Int,
-    itemCount: Int,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete Tag") },
+        title = { Text("Archive Identity") },
         text = {
             Column {
-                Text("Are you sure you want to delete \"$tagName\"?")
+                Text("Archive \"$tagName\"? Linked memories will lose this association.")
                 if (childCount > 0) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "$childCount child tag(s) will be moved up one level.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (itemCount > 0) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        "$itemCount item association(s) will be removed.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.1f), shape = RoundedCornerShape(8.dp)) {
+                        Text(
+                            "$childCount nested identities will be re-assigned.",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text("Delete", color = MaterialTheme.colorScheme.error)
+            Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)) {
+                Text("Delete")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Keep it")
             }
         }
     )
@@ -417,30 +383,29 @@ private fun DeleteConfirmDialog(
 
 @Composable
 private fun MoveTagDialog(
-    tagName: String,
     availableParents: List<Tag>,
     onSelect: (Long?) -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Move \"$tagName\"") },
+        title = { Text("Move Identity") },
         text = {
-            LazyColumn {
-                item {
-                    TextButton(
-                        onClick = { onSelect(null) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Move to root level")
+            Box(modifier = Modifier.heightIn(max = 400.dp)) {
+                LazyColumn {
+                    item {
+                        ListItem(
+                            headlineContent = { Text("Root Level") },
+                            leadingContent = { Icon(Icons.Default.Upload, null) },
+                            modifier = Modifier.clickable { onSelect(null) }
+                        )
                     }
-                }
-                items(availableParents) { tag ->
-                    TextButton(
-                        onClick = { onSelect(tag.id) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(tag.name)
+                    items(availableParents) { tag ->
+                        ListItem(
+                            headlineContent = { Text(tag.name) },
+                            leadingContent = { Icon(Icons.Default.SubdirectoryArrowRight, null) },
+                            modifier = Modifier.clickable { onSelect(tag.id) }
+                        )
                     }
                 }
             }

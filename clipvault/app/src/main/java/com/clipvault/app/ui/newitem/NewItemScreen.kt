@@ -7,51 +7,19 @@ import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.CardDefaults
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
@@ -73,19 +41,16 @@ fun NewItemScreen(
     val errorMessage by viewModel.errorMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
-    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    val coroutineScope = rememberCoroutineScope()
 
-    // Set initial text from intent
     LaunchedEffect(initialText) {
         initialText?.let { viewModel.setContent(it) }
     }
 
-    // Navigate back on save
     LaunchedEffect(saved) {
         if (saved) onBack()
     }
 
-    // Show error messages
     LaunchedEffect(errorMessage) {
         errorMessage?.let {
             snackbarHostState.showSnackbar(it)
@@ -93,38 +58,26 @@ fun NewItemScreen(
         }
     }
 
-    // Image picker
     val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         try {
-            uri?.let {
-                android.util.Log.d("NewItemScreen", "image picked: $it")
-                viewModel.copyUriAndSetType(it, "image/jpeg")
-            }
+            uri?.let { viewModel.copyUriAndSetType(it, "image/jpeg") }
         } catch (e: Exception) {
-            android.util.Log.e("NewItemScreen", "image picker callback failed", e)
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar("Failed to import image: ${e.message}")
-            }
+            coroutineScope.launch { snackbarHostState.showSnackbar("Failed to import image: ${e.message}") }
         }
     }
 
-    // File picker for media
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         try {
             uri?.let {
-                android.util.Log.d("NewItemScreen", "file picked: $it")
                 val mimeType = context.contentResolver.getType(it)
                 viewModel.copyUriAndSetType(it, mimeType)
             }
         } catch (e: Exception) {
-            android.util.Log.e("NewItemScreen", "file picker callback failed", e)
-            coroutineScope.launch {
-                snackbarHostState.showSnackbar("Failed to import file: ${e.message}")
-            }
+            coroutineScope.launch { snackbarHostState.showSnackbar("Failed to import file: ${e.message}") }
         }
     }
 
@@ -132,12 +85,13 @@ fun NewItemScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("New Clip") },
+                title = { },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         }
     ) { innerPadding ->
@@ -146,71 +100,55 @@ fun NewItemScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp)
+                .padding(horizontal = 24.dp)
         ) {
-            // Content input (Bento shape)
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(
+                text = "New Memory",
+                style = MaterialTheme.typography.headlineLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = "Capture a piece of your digital world",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+
             OutlinedTextField(
                 value = content,
                 onValueChange = { viewModel.setContent(it) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(200.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp),
                 label = { Text("Content") },
                 placeholder = { Text("Enter text, URL, or paste content...") },
-                shape = BentoAsymmetricCardShape
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    unfocusedBorderColor = Color.Transparent,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                )
             )
 
             if (attachments.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "Attachments",
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(text = "Attachments", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(12.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     attachments.forEachIndexed { index, attachment ->
                         ElevatedCard(
                             modifier = Modifier.fillMaxWidth(),
                             shape = BentoAsymmetricCardShape,
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                            ),
+                            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
                             elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                            ) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 if (attachment.type == "image") {
-                                    AsyncImage(
-                                        model = attachment.filePath,
-                                        contentDescription = "Selected image preview",
-                                        modifier = Modifier
-                                            .size(80.dp)
-                                            .clip(BentoAsymmetricCardShape),
-                                        contentScale = ContentScale.Crop
-                                    )
+                                    AsyncImage(model = attachment.filePath, contentDescription = null, modifier = Modifier.size(80.dp).clip(BentoAsymmetricCardShape), contentScale = ContentScale.Crop)
                                 } else {
-                                    Row(
-                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                                        modifier = Modifier.weight(1f).padding(start = 8.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = if (attachment.type == "media") Icons.Default.CameraAlt else Icons.Default.Save,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(24.dp),
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+                                        Icon(imageVector = if (attachment.type == "media") Icons.Default.PlayCircle else Icons.Default.Description, contentDescription = null, modifier = Modifier.size(24.dp), tint = MaterialTheme.colorScheme.primary)
                                         Spacer(modifier = Modifier.width(12.dp))
-                                        Text(
-                                            text = attachment.filePath.substringAfterLast('/'),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                        Text(text = attachment.filePath.substringAfterLast('/'), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     }
                                 }
                                 IconButton(onClick = { viewModel.removeAttachment(index) }) {
@@ -222,104 +160,72 @@ fun NewItemScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Import buttons (Pill shape)
-            Text(
-                text = "Import from",
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { imagePickerLauncher.launch("image/*") },
-                    shape = PillShape
-                ) {
-                    Icon(Icons.Default.Image, contentDescription = null)
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(text = "Import from", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(onClick = { imagePickerLauncher.launch("image/*") }, shape = PillShape, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)) {
+                    Icon(Icons.Default.Image, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text("Gallery")
                 }
-                OutlinedButton(
-                    onClick = { filePickerLauncher.launch("*/*") },
-                    shape = PillShape
-                ) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = null)
+                Button(onClick = { filePickerLauncher.launch("*/*") }, shape = PillShape, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = MaterialTheme.colorScheme.onSecondaryContainer)) {
+                    Icon(Icons.Default.AttachFile, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text("File")
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Tags section
-            Text(
-                text = "Tags",
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            Spacer(modifier = Modifier.height(32.dp))
+            Text(text = "Identity", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.height(12.dp))
 
             var newTagName by remember { mutableStateOf("") }
-
             com.clipvault.app.ui.components.TagTreeSelector(
                 allTags = allTags,
                 selectedTagIds = selectedTags.toSet(),
-                tagPaths = remember(allTags) {
-                    val tagMap = allTags.associateBy { it.id }
-                    allTags.associate { tag ->
-                        val path = mutableListOf<String>()
-                        var current: com.clipvault.app.data.local.entity.Tag? = tag
-                        var safety = 50
-                        while (current != null && safety-- > 0) {
-                            path.add(current.name)
-                            current = tagMap[current.parentId]
-                        }
-                        tag.id to path.reversed().joinToString("/")
-                    }
-                },
+                tagPaths = emptyMap(),
                 onTagToggle = { tagId, _ -> viewModel.toggleTag(tagId) }
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // New tag input (Bento shape)
+            Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
                 value = newTagName,
                 onValueChange = { newTagName = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("New tag name") },
+                label = { Text("Quick Tag") },
                 singleLine = true,
-                shape = BentoAsymmetricCardShape,
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                    unfocusedBorderColor = Color.Transparent,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                ),
                 trailingIcon = {
                     if (newTagName.isNotBlank()) {
-                        IconButton(onClick = {
-                            viewModel.createTag(newTagName, null)
-                            newTagName = ""
-                        }) {
-                            Icon(Icons.Default.Save, contentDescription = "Add")
+                        IconButton(onClick = { viewModel.createTag(newTagName, null); newTagName = "" }) {
+                            Icon(Icons.Default.Add, contentDescription = "Add")
                         }
                     }
                 }
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Save button (Pill shape)
+            Spacer(modifier = Modifier.height(48.dp))
             Button(
                 onClick = { viewModel.save() },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 enabled = !isSaving && (content.isNotBlank() || attachments.isNotEmpty()),
                 shape = PillShape
             ) {
                 if (isSaving) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.padding(end = 8.dp),
-                        strokeWidth = 2.dp
-                    )
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp).padding(end = 8.dp), strokeWidth = 2.dp)
+                } else {
+                    Icon(Icons.Default.AutoAwesome, null)
+                    Spacer(Modifier.width(12.dp))
                 }
-                Icon(Icons.Default.Save, contentDescription = null)
-                Text("Save")
+                Text("Save to Vault", style = MaterialTheme.typography.titleMedium)
             }
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

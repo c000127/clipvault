@@ -2,6 +2,8 @@ package com.clipvault.app.ui.detail
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -25,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.media3.exoplayer.ExoPlayer
@@ -59,6 +63,9 @@ fun DetailScreen(
     val editAttachments by viewModel.editAttachments.collectAsState()
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    
+    val lifecycleState by lifecycleOwner.lifecycle.currentStateFlow.collectAsState()
+    val isInteractionAllowed = lifecycleState == androidx.lifecycle.Lifecycle.State.RESUMED
 
     val attachmentPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -195,179 +202,374 @@ fun DetailScreen(
     }
 
     with(sharedTransitionScope) {
-        Scaffold(
-            modifier = Modifier.sharedElement(
-                rememberSharedContentState(key = "item_${viewModel.itemId}"),
-                animatedVisibilityScope = animatedVisibilityScope
-            ),
-            topBar = {
-                TopAppBar(
-                    title = { Text("Detail") },
-                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } }
-                )
-            }
-        ) { innerPadding ->
-            item?.let { clipItem ->
-                Column(modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState())) {
-                    ElevatedCard(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                        shape = BentoAsymmetricCardShape,
-                        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Scaffold(
+                modifier = Modifier.sharedElement(
+                    rememberSharedContentState(key = "item_${viewModel.itemId}"),
+                    animatedVisibilityScope = animatedVisibilityScope
+                ),
+                containerColor = MaterialTheme.colorScheme.surface,
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            val titleText = item?.content?.lineSequence()?.firstOrNull()?.take(20) ?: "Clip Detail"
+                            Text(
+                                text = titleText,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                        )
+                    )
+                },
+                bottomBar = {
+                    Surface(
+                        tonalElevation = 3.dp,
+                        shadowElevation = 8.dp,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Text(text = "Content", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                if (!isEditing) IconButton(onClick = { viewModel.startEdit() }) { Icon(Icons.Default.Edit, contentDescription = "Edit") }
-                            }
-                            if (isEditing) {
-                                OutlinedTextField(value = editContent, onValueChange = { viewModel.updateEditContent(it) }, modifier = Modifier.fillMaxWidth().height(200.dp), shape = RoundedCornerShape(16.dp))
+                        AnimatedContent(
+                            targetState = isEditing,
+                            transitionSpec = {
+                                (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { it } + fadeOut())
+                            },
+                            label = "ActionHub"
+                        ) { editing ->
+                            if (editing) {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                                        .navigationBarsPadding(),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { viewModel.cancelEdit() },
+                                        modifier = Modifier.weight(1f),
+                                        shape = PillShape,
+                                        enabled = isInteractionAllowed // 动画拦截
+                                    ) {
+                                        Text("Cancel")
+                                    }
+                                    Button(
+                                        onClick = { viewModel.saveEdit() },
+                                        modifier = Modifier.weight(1f),
+                                        shape = PillShape,
+                                        enabled = isInteractionAllowed, // 动画拦截
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                    ) {
+                                        Icon(Icons.Default.Check, null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("Save")
+                                    }
+                                }
                             } else {
-                                Text(text = clipItem.content, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.fillMaxWidth())
+                                Row(
+                                    modifier = Modifier
+                                        .padding(horizontal = 24.dp, vertical = 12.dp)
+                                        .navigationBarsPadding(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Emotional/Dynamic AI Button
+                                    Button(
+                                        onClick = {
+                                            if (item?.aiSummary?.isNotBlank() == true) viewModel.regenerateAiSummary()
+                                            else viewModel.analyzeContent()
+                                        },
+                                        modifier = Modifier.weight(2f),
+                                        shape = PillShape,
+                                        enabled = isInteractionAllowed && aiState !is AiState.Loading, // 双重拦截
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    ) {
+                                        if (aiState is AiState.Loading) {
+                                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                                        } else {
+                                            Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(20.dp))
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(if (item?.aiSummary?.isNotBlank() == true) "Refine AI" else "AI Insight")
+                                    }
+
+                                    // Secondary Actions
+                                    IconButton(
+                                        onClick = { viewModel.startEdit() },
+                                        enabled = isInteractionAllowed,
+                                        modifier = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest, PillShape)
+                                    ) {
+                                        Icon(Icons.Default.Edit, "Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+
+                                    IconButton(
+                                        onClick = { showDeleteDialog = true },
+                                        enabled = isInteractionAllowed,
+                                        modifier = Modifier.background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f), PillShape)
+                                    ) {
+                                        Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
                             }
                         }
                     }
+                }
+            ) { innerPadding ->
+                item?.let { clipItem ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        var visible by remember { mutableStateOf(false) }
+                        LaunchedEffect(Unit) {
+                            visible = true
+                        }
 
-                    if (playingUri != null) {
-                        ElevatedCard(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                            shape = BentoAsymmetricCardShape,
-                            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 3.dp)
+                        // HERO SECTION: Images & Media
+                        AnimatedVisibility(
+                            visible = visible,
+                            enter = slideInVertically(initialOffsetY = { 40 }) + fadeIn(),
+                            label = "HeroAnim"
                         ) {
-                            Box(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                                MediaContent(exoPlayer = viewModel.exoPlayer)
+                            Column {
+                                val imageAttachments = clipItem.attachments.filter { it.type == "image" }
+                                if (imageAttachments.isNotEmpty()) {
+                                    imageAttachments.forEach { attachment ->
+                                        var aspectRatio by remember { mutableStateOf<Float?>(null) }
+                                        AsyncImage(
+                                            model = attachment.filePath,
+                                            contentDescription = null,
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .then(if (aspectRatio != null) Modifier.aspectRatio(aspectRatio!!) else Modifier.heightIn(min = 200.dp))
+                                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                                .clip(MaterialTheme.shapes.extraLarge),
+                                            onSuccess = { state ->
+                                                val size = state.painter.intrinsicSize
+                                                if (size.width > 0 && size.height > 0) aspectRatio = size.width / size.height
+                                            },
+                                            contentScale = ContentScale.FillWidth
+                                        )
+                                    }
+                                }
+
+                                if (playingUri != null) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                                            .clip(BentoAsymmetricCardShape)
+                                            .background(Color.Black)
+                                    ) {
+                                        MediaContent(exoPlayer = viewModel.exoPlayer)
+                                    }
+                                }
                             }
                         }
-                    }
 
-                    if (isEditing) {
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // CONTENT SECTION
                         ElevatedCard(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            shape = BentoAsymmetricCardShape,
+                            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(20.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Notes, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Content", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                if (isEditing) {
+                                    OutlinedTextField(
+                                        value = editContent,
+                                        onValueChange = { viewModel.updateEditContent(it) },
+                                        modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                                            unfocusedBorderColor = Color.Transparent,
+                                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                                        )
+                                    )
+                                } else {
+                                    Text(
+                                        text = clipItem.content,
+                                        style = MaterialTheme.typography.bodyLarge.copy(lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
+
+                        // AI INSIGHT SECTION
+                        AnimatedVisibility(
+                            visible = clipItem.aiSummary.isNotBlank(),
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            OutlinedCard(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                shape = BentoAsymmetricCardShape,
+                                colors = CardDefaults.outlinedCardColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.15f)
+                                ),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.2f))
+                            ) {
+                                Column(modifier = Modifier.padding(20.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) { 
+                                            Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(18.dp))
+                                            Text("AI Synthesis", modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.tertiary) 
+                                        }
+                                        if (!isEditing) {
+                                            IconButton(onClick = { viewModel.deleteAiSummary() }, modifier = Modifier.size(24.dp)) { 
+                                                Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0.6f), modifier = Modifier.size(14.dp)) 
+                                            }
+                                        }
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        text = clipItem.aiSummary,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                }
+                            }
+                        }
+
+                        // ATTACHMENTS SECTION
+                        val other = clipItem.attachments.filter { it.type != "image" }
+                        if (other.isNotEmpty() || isEditing) {
+                            ElevatedCard(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                shape = BentoAsymmetricCardShape,
+                                colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+                            ) {
+                                Column(modifier = Modifier.padding(20.dp)) {
+                                    Text(text = "Assets", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary)
+                                    Spacer(Modifier.height(12.dp))
+                                    
+                                    if (isEditing) {
+                                        editAttachments.forEach { attachment ->
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp)).padding(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(if (attachment.type == "image") Icons.Default.Image else Icons.Default.AttachFile, null, modifier = Modifier.size(24.dp))
+                                                Text(text = attachment.filePath.substringAfterLast('/'), modifier = Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                                IconButton(onClick = { viewModel.removeAttachmentFromEdit(attachment.id) }, modifier = Modifier.size(24.dp)) { 
+                                                    Icon(Icons.Default.RemoveCircleOutline, null, tint = MaterialTheme.colorScheme.error) 
+                                                }
+                                            }
+                                        }
+                                        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            AssistChip(
+                                                onClick = { imagePickerLauncher.launch("image/*") },
+                                                label = { Text("Add Photo") },
+                                                leadingIcon = { Icon(Icons.Default.AddPhotoAlternate, null, modifier = Modifier.size(18.dp)) }
+                                            )
+                                            AssistChip(
+                                                onClick = { attachmentPickerLauncher.launch("*/*") },
+                                                label = { Text("Add File") },
+                                                leadingIcon = { Icon(Icons.Default.FileUpload, null, modifier = Modifier.size(18.dp)) }
+                                            )
+                                        }
+                                    } else {
+                                        other.forEach { attachment ->
+                                            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                                                when (attachment.type) {
+                                                    "media" -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(Icons.Default.PlayCircle, null, tint = MaterialTheme.colorScheme.primary)
+                                                        Text(text = attachment.filePath.substringAfterLast('/'), modifier = Modifier.weight(1f).padding(horizontal = 8.dp), style = MaterialTheme.typography.bodyMedium)
+                                                        Button(onClick = { viewModel.playMedia(attachment.filePath) }, shape = PillShape, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp), modifier = Modifier.height(28.dp)) { Text("Play", style = MaterialTheme.typography.labelSmall) }
+                                                    }
+                                                    "link" -> LinkContent(url = attachment.filePath, fetchedContent = clipItem.fetchedContent, fetchState = fetchState, onFetch = { viewModel.fetchLinkContent(attachment.filePath) }, onOpenBrowser = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(attachment.filePath))) })
+                                                    else -> Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(Icons.Default.Description, null, tint = MaterialTheme.colorScheme.secondary)
+                                                        Text(text = attachment.filePath.substringAfterLast('/'), modifier = Modifier.padding(horizontal = 8.dp), style = MaterialTheme.typography.bodyMedium)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // METADATA (TAGS) SECTION
+                        ElevatedCard(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
                             shape = BentoAsymmetricCardShape,
                             colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                         ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(text = "Edit Attachments", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                if (editAttachments.isNotEmpty()) {
-                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        editAttachments.forEachIndexed { index, attachment ->
-                                            Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(12.dp)).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                                if (attachment.type == "image") {
-                                                    AsyncImage(model = attachment.filePath, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)), contentDescription = null, contentScale = ContentScale.Crop)
-                                                } else {
-                                                    Icon(Icons.Default.AttachFile, contentDescription = null, modifier = Modifier.size(48.dp))
-                                                }
-                                                Text(text = attachment.filePath.substringAfterLast('/'), modifier = Modifier.weight(1f).padding(horizontal = 8.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                                IconButton(onClick = { viewModel.removeAttachmentFromEdit(attachment.id) }) { Icon(Icons.Default.Close, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error) }
-                                            }
+                            Column(modifier = Modifier.padding(20.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = "Identity", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                                    IconButton(onClick = { showTagEditSheet = true }, modifier = Modifier.size(24.dp)) { 
+                                        Icon(Icons.Default.Label, null, tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f), modifier = Modifier.size(16.dp)) 
+                                    }
+                                }
+                                Spacer(Modifier.height(12.dp))
+                                if (tags.isEmpty()) {
+                                    Text("No tags assigned.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                } else {
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        tags.forEach { tag ->
+                                            SuggestionChip(
+                                                onClick = { },
+                                                label = { Text(tag.name) },
+                                                shape = PillShape,
+                                                colors = SuggestionChipDefaults.suggestionChipColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)
+                                            )
                                         }
                                     }
                                 }
-                                Row(modifier = Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedButton(onClick = { imagePickerLauncher.launch("image/*") }, modifier = Modifier.weight(1f), shape = PillShape) { Text("Add Image") }
-                                    OutlinedButton(onClick = { attachmentPickerLauncher.launch("*/*") }, modifier = Modifier.weight(1f), shape = PillShape) { Text("Add File") }
+                                if (clipItem.sourceApp.isNotBlank()) {
+                                    Spacer(Modifier.height(12.dp))
+                                    Text("Captured from ${clipItem.sourceApp}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
                                 }
                             }
                         }
-                    } else {
-                        clipItem.attachments.filter { it.type == "image" }.forEach { attachment ->
-                            var aspectRatio by remember { mutableStateOf<Float?>(null) }
-                            Box(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(12.dp)).padding(12.dp)) {
-                                AsyncImage(
-                                    model = attachment.filePath,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxWidth().then(if (aspectRatio != null) Modifier.aspectRatio(aspectRatio!!) else Modifier.heightIn(min = 180.dp)).clip(MaterialTheme.shapes.large),
-                                    onSuccess = { state ->
-                                        val size = state.painter.intrinsicSize
-                                        if (size.width > 0 && size.height > 0) aspectRatio = size.width / size.height
-                                    },
-                                    contentScale = ContentScale.FillWidth
-                                )
-                            }
-                        }
-
-                        val other = clipItem.attachments.filter { it.type != "image" }
-                        if (other.isNotEmpty()) {
-                            Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(12.dp)).padding(12.dp)) {
-                                Text(text = "Attachments & Links", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                                other.forEach { attachment ->
-                                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                                        when (attachment.type) {
-                                            "media" -> Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.CameraAlt, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                                Text(text = attachment.filePath.substringAfterLast('/'), modifier = Modifier.weight(1f).padding(horizontal = 8.dp))
-                                                Button(onClick = { viewModel.playMedia(attachment.filePath) }, shape = PillShape) { Text("Play") }
-                                            }
-                                            "link" -> LinkContent(url = attachment.filePath, fetchedContent = clipItem.fetchedContent, fetchState = fetchState, onFetch = { viewModel.fetchLinkContent(attachment.filePath) }, onOpenBrowser = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(attachment.filePath))) })
-                                            else -> Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.Save, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                                Text(text = attachment.filePath.substringAfterLast('/'), modifier = Modifier.padding(horizontal = 8.dp))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        
+                        Spacer(modifier = Modifier.height(100.dp)) // Padding for bottom bar
                     }
-
-                    if (isEditing) {
-                        Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { viewModel.cancelEdit() }, modifier = Modifier.weight(1f), shape = PillShape) { Text("Cancel") }
-                            Button(onClick = { viewModel.saveEdit() }, modifier = Modifier.weight(1f), shape = PillShape) { Text("Save") }
-                        }
-                    } else {
-                        Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Card(modifier = Modifier.weight(1f), shape = PillShape, colors = CardDefaults.cardColors(containerColor = if (aiState is AiState.Loading) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.primaryContainer)) {
-                                Row(modifier = Modifier.clickable(enabled = aiState !is AiState.Loading) { if (clipItem.aiSummary.isNotBlank()) viewModel.regenerateAiSummary() else viewModel.analyzeContent() }.padding(vertical = 12.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                                    if (aiState is AiState.Loading) CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                                    else Icon(Icons.Default.AutoAwesome, contentDescription = null)
-                                    Text(text = if (aiState is AiState.Loading) "分析中..." else if (clipItem.aiSummary.isNotBlank()) "重新生成" else "AI 智能分析", modifier = Modifier.padding(start = 8.dp))
-                                }
-                            }
-                            OutlinedButton(onClick = { showDeleteDialog = true }, colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error), shape = PillShape) { Text("Delete") }
-                        }
-                    }
-
-                    if (clipItem.aiSummary.isNotBlank()) {
-                        OutlinedCard(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 16.dp),
-                            shape = BentoAsymmetricCardShape,
-                            colors = CardDefaults.outlinedCardColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.2f)
-                            ),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f))
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) { 
-                                        Icon(Icons.Default.AutoAwesome, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(20.dp))
-                                        Text("AI Insight", modifier = Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.tertiary) 
-                                    }
-                                    Row {
-                                        IconButton(onClick = { viewModel.regenerateAiSummary() }, enabled = aiState !is AiState.Loading, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Refresh, null, tint = MaterialTheme.colorScheme.tertiary, modifier = Modifier.size(18.dp)) }
-                                        IconButton(onClick = { viewModel.deleteAiSummary() }, modifier = Modifier.size(32.dp)) { Icon(Icons.Default.Close, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp)) }
-                                    }
-                                }
-                                Text(text = clipItem.aiSummary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onTertiaryContainer)
-                            }
-                        }
-                    }
-
-                    Column(modifier = Modifier.fillMaxWidth().padding(top = 16.dp).background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(12.dp)).padding(16.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text(text = "Tags", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
-                            IconButton(onClick = { showTagEditSheet = true }) { Icon(Icons.Default.Edit, null) }
-                        }
-                        tags.forEach { tag ->
-                            Text(text = "# ${tag.name}", style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(24.dp))
                 }
-            } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            }
+
+            if (!isInteractionAllowed) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    awaitPointerEvent(PointerEventPass.Initial)
+                                        .changes.forEach { it.consume() }
+                                }
+                            }
+                        }
+                )
+            }
         }
     }
 }
@@ -375,16 +577,26 @@ fun DetailScreen(
 @Composable
 private fun LinkContent(url: String, fetchedContent: String, fetchState: FetchState, onFetch: () -> Unit, onOpenBrowser: () -> Unit) {
     Column {
-        Text(text = url, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onOpenBrowser, shape = PillShape) { Text("Open") }
-            Button(onClick = onFetch, shape = PillShape) { Text("Fetch") }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Language, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(text = url, color = MaterialTheme.colorScheme.primary, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
         }
-        if (fetchedContent.isNotBlank()) Text(text = fetchedContent.take(200), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+        Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = onOpenBrowser, shape = PillShape, contentPadding = PaddingValues(horizontal = 12.dp), modifier = Modifier.height(32.dp)) { Text("Open", style = MaterialTheme.typography.labelMedium) }
+            TextButton(onClick = onFetch, modifier = Modifier.height(32.dp)) { Text("Fetch Content", style = MaterialTheme.typography.labelMedium) }
+        }
+        if (fetchedContent.isNotBlank()) {
+            Spacer(Modifier.height(4.dp))
+            Text(text = fetchedContent.take(150) + "...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+        }
     }
 }
 
 @Composable
 private fun MediaContent(exoPlayer: ExoPlayer) {
-    AndroidView(factory = { ctx -> androidx.media3.ui.PlayerView(ctx).apply { player = exoPlayer } }, modifier = Modifier.fillMaxWidth().aspectRatio(16f/9f).clip(RoundedCornerShape(16.dp)))
+    AndroidView(
+        factory = { ctx -> androidx.media3.ui.PlayerView(ctx).apply { player = exoPlayer; useController = true } }, 
+        modifier = Modifier.fillMaxWidth().aspectRatio(16f/9f).clip(RoundedCornerShape(20.dp))
+    )
 }
