@@ -205,3 +205,77 @@
 - [x] **Preview Refinement**: Added `PreviewWrapper` in `Theme.kt` to simplify UI preview management.
 - [x] **Interaction Cleanup**: Removed `graphicsLayer` scale from cards to prevent text rendering artifacts during long-press.
 - [x] **Build Verification**: All changes passed `./gradlew assembleDebug`.
+
+## Adaptive Refactoring (Android 17 Adaptive-First) ✅
+
+### Phase 2: Data Model Extension
+- [x] `BehaviorLog` entity — behavior event tracking (event, metadata, timestamp, sessionId)
+- [x] `UserInsight` entity — aggregated behavior patterns (type, key, value, sampleCount)
+- [x] `BehaviorDao` — event recording, time distribution, search/tag frequency queries
+- [x] `InsightDao` — upsert, type-based queries, delete-all
+- [x] Room Migration 3→4 — creates `behavior_logs` and `user_insights` tables with indices
+- [x] `DatabaseModule` updated — provides new DAOs
+- [x] Build verification passed
+
+### Phase 3: Adaptive Layout Infrastructure
+- [x] Added Material 3 Adaptive dependencies (`adaptive`, `adaptive-layout`, `adaptive-navigation`)
+- [x] Added `androidx.window:window:1.3.0` for WindowSizeClass
+- [x] `DeviceFormFactor` enum — PhonePortrait, PhoneLandscape, Foldable, Tablet, Desktop
+- [x] `AdaptiveTokens` — responsive dimension system (pageHorizontal, gridColumns, contentMaxWidth, etc.)
+- [x] `AdaptiveScope.kt` — `rememberDeviceFormFactor()`, `rememberWindowWidthSizeClass()`, `rememberAdaptiveTokens()`
+- [x] Build verification passed
+
+### Phase 4: Adaptive Home Timeline Feed
+- [x] `ContentGrid` — responsive column count via `AdaptiveTokens.gridColumns` (2/3/4/5)
+- [x] Responsive spacing via `AdaptiveTokens.itemSpacing` and `pageHorizontal`
+- [x] Search bar width limited to 600dp on large screens, centered
+- [x] Content width limited to `AdaptiveTokens.contentMaxWidth` on large screens
+- [x] FullLine span threshold increased on large screens (200 chars vs 120)
+- [x] Phone portrait layout identical to pre-refactoring
+- [x] Build verification passed
+
+### Phase 6: Adaptive Detail + New Item Pages
+- [x] `DetailScreen` — content width limited and centered on large screens
+- [x] `NewItemScreen` — content width limited and centered on large screens
+- [x] Responsive padding via `AdaptiveTokens.pageHorizontal`
+- [x] Build verification passed
+
+### Phase 7: Adaptive Tag Management + Settings
+- [x] `TagManagerScreen` — content width limited and centered on large screens
+- [x] `SettingsScreen` — content width limited and centered on large screens
+- [x] Responsive spacing via `AdaptiveTokens.sectionGap`
+- [x] Build verification passed
+
+### Phase 8: Behavior Tracking + Adaptive Rules
+- [x] `BehaviorTracker` — singleton service for recording user behavior events
+- [x] Event types: 收藏, 搜索, AI总结, Tag操作, 页面访问, 阅读
+- [x] `InsightEngine` — aggregates BehaviorLog → UserInsight
+- [x] Tag frequency aggregation (30-day window)
+- [x] Time pattern aggregation (hourly distribution)
+- [x] Content distribution aggregation
+- [x] Search hot words with decay (7d ×3, 30d ×1, 90d ×0.3)
+- [x] AI adoption rate tracking
+- [x] 180-day log auto-archival
+- [x] "Forget My Habits" feature — clears all behavior + insight data
+- [x] Build verification passed
+
+### Phase 9: Lifecycle Stages + Memory Decay
+- [x] `LifecycleStage` enum — NEWBORN (0-7d), GROWTH (1-4w), MATURE (1-3m), EVOLUTION (3m+)
+- [x] `LifecycleManager` — stage determination based on install time
+- [x] Stage gating: adaptive features only enabled in MATURE/EVOLUTION with 50+ samples
+- [x] Session memory: tracks last session time
+- [x] "My Usage Insights" panel in SettingsScreen
+- [x] Shows lifecycle stage, days since install, adaptive status
+- [x] Shows grouped insights with sample counts
+- [x] "Forget My Habits" button
+- [x] `SettingsViewModel` updated — injects LifecycleManager + InsightEngine
+- [x] Build verification passed
+
+### Architecture Summary
+- **4 new files**: `BehaviorLog.kt`, `UserInsight.kt`, `BehaviorDao.kt`, `InsightDao.kt`
+- **3 new adaptive files**: `DeviceFormFactor.kt`, `AdaptiveTokens.kt`, `AdaptiveScope.kt`
+- **2 new behavior files**: `BehaviorTracker.kt`, `InsightEngine.kt`, `LifecycleManager.kt`
+- **6 screens made adaptive**: Home, Detail, NewItem, TagManager, Settings (AiSettings shares pattern)
+- **Database version**: 3 → 4 (migration-safe)
+- **New dependencies**: M3 Adaptive 1.1.0, WindowManager 1.3.0
+- **All behavior data local-only**: no network uploads

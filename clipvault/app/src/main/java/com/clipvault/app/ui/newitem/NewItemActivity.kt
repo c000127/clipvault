@@ -71,11 +71,18 @@ class NewItemActivity : ComponentActivity() {
 
         setContent {
             ClipVaultTheme {
-                NewItemScreen(
-                    onBack = { finish() },
-                    initialText = initialText,
-                    viewModel = viewModel
-                )
+                // [动效] NewItemActivity 独立于 NavHost，需要自己的 SharedTransitionLayout
+                androidx.compose.animation.SharedTransitionLayout {
+                    androidx.compose.animation.AnimatedVisibility(visible = true) {
+                        NewItemScreen(
+                            sharedTransitionScope = this@SharedTransitionLayout,
+                            animatedVisibilityScope = this@AnimatedVisibility,
+                            onBack = { finish() },
+                            initialText = initialText,
+                            viewModel = viewModel
+                        )
+                    }
+                }
             }
         }
     }

@@ -5,10 +5,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
+// [自适应] 导入自适应布局工具
+import com.clipvault.app.ui.adaptive.rememberAdaptiveTokens
+import com.clipvault.app.ui.adaptive.rememberDeviceFormFactor
+import com.clipvault.app.ui.adaptive.DeviceFormFactor
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.*
 import androidx.compose.material.icons.Icons
@@ -21,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -31,12 +35,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloatAsState
-import com.clipvault.app.ui.theme.ClipVaultMotion
 import androidx.compose.ui.graphics.Color
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
+// [动效] 引用全局动效 Token
+import com.clipvault.app.ui.theme.ClipVaultMotion
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -61,6 +62,9 @@ fun HomeScreen(
     val selectedItemIds by viewModel.selectedItemIds.collectAsState()
     var showTagFilter by remember { mutableStateOf(false) }
     val pagingItems = viewModel.items.collectAsLazyPagingItems()
+    // [自适应] 获取当前设备形态和 Token
+    val tokens = rememberAdaptiveTokens()
+    val formFactor = rememberDeviceFormFactor()
  
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
@@ -127,8 +131,14 @@ fun HomeScreen(
                 // Batch Actions Bar
                 AnimatedVisibility(
                     visible = selectedItemIds.isNotEmpty(),
-                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                    enter = slideInVertically(
+                        initialOffsetY = { it },
+                        animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard, easing = ClipVaultMotion.DefaultEasing)
+                    ) + fadeIn(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)),
+                    exit = slideOutVertically(
+                        targetOffsetY = { it },
+                        animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick, easing = ClipVaultMotion.DefaultEasing)
+                    ) + fadeOut(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick, easing = ClipVaultMotion.DefaultEasing))
                 ) {
                     BottomAppBar(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -149,16 +159,22 @@ fun HomeScreen(
                 }
                 
                 // Thumb-zone Search & Filter Bar
+                // [自适应] 大屏模式下限制搜索栏最大宽度并居中
                 if (selectedItemIds.isEmpty()) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                            .navigationBarsPadding(),
-                        shape = PillShape,
-                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        shadowElevation = 4.dp
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
                     ) {
+                        Surface(
+                            modifier = Modifier
+                                .widthIn(max = if (formFactor.isLargeScreen) 600.dp else Dp.Unspecified)
+                                .fillMaxWidth()
+                                .padding(horizontal = tokens.pageHorizontal, vertical = 12.dp)
+                                .navigationBarsPadding(),
+                            shape = PillShape,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            shadowElevation = 4.dp
+                        ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 8.dp)
@@ -204,15 +220,25 @@ fun HomeScreen(
                                 Icon(Icons.Default.Add, "New")
                             }
                         }
+                        }
                     }
                 }
             }
         }
     ) { innerPadding ->
+        // [自适应] 大屏模式下限制内容最大宽度并居中
+        Box(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding) // 遵循完整 Scaffold Padding，解决顶部重叠
+                .then(
+                    if (tokens.contentMaxWidth != androidx.compose.ui.unit.Dp.Unspecified)
+                        Modifier.widthIn(max = tokens.contentMaxWidth)
+                    else Modifier
+                )
         ) {
             val dbInitFailed = remember { com.clipvault.app.ClipVaultApplication.dbInitFailed }
             
@@ -241,6 +267,7 @@ fun HomeScreen(
                 )
             }
         }
+        } // [自适应] Box wrapper for centered content on large screens
     }
 }
 
@@ -286,8 +313,12 @@ private fun SelectedTagsRow(allTags: List<Tag>, selectedTagIds: Set<Long>, viewM
 private fun ClipboardSuggestionCard(text: String?, viewModel: HomeViewModel) {
     AnimatedVisibility(
         visible = text != null,
-        enter = expandVertically() + fadeIn(),
-        exit = shrinkVertically() + fadeOut(),
+        enter = expandVertically(
+            animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard, easing = ClipVaultMotion.DefaultEasing)
+        ) + fadeIn(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)),
+        exit = shrinkVertically(
+            animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick, easing = ClipVaultMotion.DefaultEasing)
+        ) + fadeOut(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick, easing = ClipVaultMotion.DefaultEasing)),
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         text?.let { content ->
@@ -321,14 +352,20 @@ private fun ContentGrid(
     onItemClick: (Long) -> Unit,
     onLongClick: (Long) -> Unit
 ) {
+    // [自适应] 根据设备形态决定列数和间距
+    val tokens = rememberAdaptiveTokens()
+    val formFactor = rememberDeviceFormFactor()
+    val gridColumns = tokens.gridColumns
+    val spacing = tokens.itemSpacing
+
     when (val refreshState = pagingItems.loadState.refresh) {
         is LoadState.Loading -> {
             LazyVerticalStaggeredGrid(
-                columns = StaggeredGridCells.Fixed(2),
+                columns = StaggeredGridCells.Fixed(gridColumns),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalItemSpacing = 12.dp
+                contentPadding = PaddingValues(tokens.pageHorizontal),
+                horizontalArrangement = Arrangement.spacedBy(spacing),
+                verticalItemSpacing = spacing
             ) {
                 items(6) { com.clipvault.app.ui.components.BentoSkeletonItem() }
             }
@@ -345,18 +382,19 @@ private fun ContentGrid(
                 }
             } else {
                 LazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Fixed(2),
+                    columns = StaggeredGridCells.Fixed(gridColumns),
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalItemSpacing = 12.dp
+                    contentPadding = PaddingValues(tokens.pageHorizontal),
+                    horizontalArrangement = Arrangement.spacedBy(spacing),
+                    verticalItemSpacing = spacing
                 ) {
                     pagingItems(
                         items = pagingItems,
                         key = { it.id },
                         span = { item ->
-                            // 动态布局逻辑优化：降低阈值以适应小屏
-                            if (item.thumbnailPath.isNotBlank() || item.content.length > 120) StaggeredGridItemSpan.FullLine
+                            // [自适应] 大屏模式下减少 FullLine span，让卡片更紧凑
+                            val threshold = if (formFactor.isLargeScreen) 200 else 120
+                            if (item.thumbnailPath.isNotBlank() || item.content.length > threshold) StaggeredGridItemSpan.FullLine
                             else StaggeredGridItemSpan.SingleLane
                         }
                     ) { clipItem ->

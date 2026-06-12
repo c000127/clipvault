@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
+import com.clipvault.app.ui.theme.ClipVaultMotion
 
 fun Modifier.shimmerLoadingAnimation(): Modifier = composed {
     val transition = rememberInfiniteTransition(label = "shimmer")
@@ -20,7 +21,8 @@ fun Modifier.shimmerLoadingAnimation(): Modifier = composed {
         initialValue = 0f,
         targetValue = 1000f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            // [动效] 骨架屏：使用 ClipVaultMotion 线性缓动
+            animation = tween(durationMillis = ClipVaultMotion.Deliberate * 2, easing = ClipVaultMotion.LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "shimmer"

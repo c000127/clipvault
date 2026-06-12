@@ -31,8 +31,9 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.tween
 import com.clipvault.app.ui.theme.ClipVaultMotion
 
 @AndroidEntryPoint
@@ -62,8 +63,6 @@ class MainActivity : ComponentActivity() {
                     
                     android.util.Log.d("Navigation", "Back requested. Current: ${currentEntry?.destination?.route}, Prev: ${prevEntry?.destination?.route}, State: ${currentEntry?.lifecycle?.currentState}")
                     
-                    // Only allow popping if we are in RESUMED state (prevents multiple rapid clicks)
-                    // and if there's actually a screen to go back to (prevents popping the root)
                     if (currentEntry?.lifecycle?.currentState == androidx.lifecycle.Lifecycle.State.RESUMED &&
                         prevEntry != null) {
                         navController.popBackStack()
@@ -71,6 +70,10 @@ class MainActivity : ComponentActivity() {
                         android.util.Log.w("Navigation", "Prevented popping the root destination.")
                     }
                 }
+
+                // [动效] 全局页面转场规范
+                // 所有前进/返回转场使用统一的 PageSlide spring + fade 组合
+                // 与 ClipVaultMotion.Token 系统一致
 
                 SharedTransitionLayout {
                     NavHost(
@@ -81,15 +84,27 @@ class MainActivity : ComponentActivity() {
                         composable<Screen.Home>(
                             enterTransition = {
                                 slideInHorizontally(
-                                    initialOffsetX = { it },
-                                    animationSpec = spring(stiffness = Spring.StiffnessLow)
-                                )
+                                    initialOffsetX = { it / 3 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
                             },
                             exitTransition = {
                                 slideOutHorizontally(
-                                    targetOffsetX = { -it },
-                                    animationSpec = spring(stiffness = Spring.StiffnessLow)
-                                )
+                                    targetOffsetX = { -it / 3 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
+                            },
+                            popEnterTransition = {
+                                slideInHorizontally(
+                                    initialOffsetX = { -it / 3 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
+                            },
+                            popExitTransition = {
+                                slideOutHorizontally(
+                                    targetOffsetX = { it / 3 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
                             }
                         ) {
                             HomeScreen(
@@ -121,15 +136,27 @@ class MainActivity : ComponentActivity() {
                         composable<Screen.Detail>(
                             enterTransition = {
                                 slideInHorizontally(
-                                    initialOffsetX = { it },
-                                    animationSpec = spring(stiffness = Spring.StiffnessLow)
-                                )
+                                    initialOffsetX = { it / 2 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
                             },
                             exitTransition = {
                                 slideOutHorizontally(
-                                    targetOffsetX = { -it },
-                                    animationSpec = spring(stiffness = Spring.StiffnessLow)
-                                )
+                                    targetOffsetX = { -it / 3 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
+                            },
+                            popEnterTransition = {
+                                slideInHorizontally(
+                                    initialOffsetX = { -it / 3 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
+                            },
+                            popExitTransition = {
+                                slideOutHorizontally(
+                                    targetOffsetX = { it / 2 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
                             }
                         ) {
                             DetailScreen(
@@ -142,30 +169,76 @@ class MainActivity : ComponentActivity() {
                         composable<Screen.New>(
                             enterTransition = {
                                 slideInHorizontally(
-                                    initialOffsetX = { it },
-                                    animationSpec = spring(stiffness = Spring.StiffnessLow)
-                                )
+                                    initialOffsetX = { it / 2 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
                             },
                             exitTransition = {
                                 slideOutHorizontally(
-                                    targetOffsetX = { -it },
-                                    animationSpec = spring(stiffness = Spring.StiffnessLow)
-                                )
+                                    targetOffsetX = { -it / 3 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
+                            },
+                            popEnterTransition = {
+                                slideInHorizontally(
+                                    initialOffsetX = { -it / 3 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
+                            },
+                            popExitTransition = {
+                                slideOutHorizontally(
+                                    targetOffsetX = { it / 2 },
+                                    animationSpec = ClipVaultMotion.PageSlide
+                                ) + fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
                             }
                         ) { backStackEntry ->
                             val route = backStackEntry.toRoute<Screen.New>()
                             NewItemScreen(
+                                sharedTransitionScope = this@SharedTransitionLayout,
+                                animatedVisibilityScope = this@composable,
                                 onBack = onBackSafe,
                                 initialText = route.text
                             )
                         }
 
-                        composable<Screen.TagManager> {
-                            TagManagerScreen(onBack = onBackSafe)
+                        composable<Screen.TagManager>(
+                            enterTransition = {
+                                fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
+                            },
+                            exitTransition = {
+                                fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
+                            },
+                            popEnterTransition = {
+                                fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
+                            },
+                            popExitTransition = {
+                                fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
+                            }
+                        ) {
+                            TagManagerScreen(
+                                sharedTransitionScope = this@SharedTransitionLayout,
+                                animatedVisibilityScope = this@composable,
+                                onBack = onBackSafe
+                            )
                         }
 
-                        composable<Screen.Settings> {
+                        composable<Screen.Settings>(
+                            enterTransition = {
+                                fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
+                            },
+                            exitTransition = {
+                                fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
+                            },
+                            popEnterTransition = {
+                                fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
+                            },
+                            popExitTransition = {
+                                fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
+                            }
+                        ) {
                             SettingsScreen(
+                                sharedTransitionScope = this@SharedTransitionLayout,
+                                animatedVisibilityScope = this@composable,
                                 onBack = onBackSafe,
                                 onAiSettings = { 
                                     if (navController.currentDestination?.hasRoute<Screen.AiSettings>() == false) {
@@ -175,8 +248,25 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        composable<Screen.AiSettings> {
-                            AiSettingsScreen(onBack = onBackSafe)
+                        composable<Screen.AiSettings>(
+                            enterTransition = {
+                                fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
+                            },
+                            exitTransition = {
+                                fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
+                            },
+                            popEnterTransition = {
+                                fadeIn(animationSpec = tween(ClipVaultMotion.Standard))
+                            },
+                            popExitTransition = {
+                                fadeOut(animationSpec = tween(ClipVaultMotion.Quick))
+                            }
+                        ) {
+                            AiSettingsScreen(
+                                sharedTransitionScope = this@SharedTransitionLayout,
+                                animatedVisibilityScope = this@composable,
+                                onBack = onBackSafe
+                            )
                         }
                     }
                 }

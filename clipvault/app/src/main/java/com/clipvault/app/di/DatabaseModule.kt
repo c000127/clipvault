@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.room.Room
 import com.clipvault.app.data.local.AppDatabase
 import com.clipvault.app.data.local.dao.AiProviderDao
+import com.clipvault.app.data.local.dao.BehaviorDao
 import com.clipvault.app.data.local.dao.ClipItemDao
+import com.clipvault.app.data.local.dao.InsightDao
 import com.clipvault.app.data.local.dao.ItemTagDao
 import com.clipvault.app.data.local.dao.TagDao
 import com.clipvault.app.data.local.dao.ContentAttachmentDao
@@ -48,5 +50,15 @@ object DatabaseModule {
     @Provides
     fun provideContentAttachmentDao(database: AppDatabase): ContentAttachmentDao {
         return database.contentAttachmentDao()
+    }
+
+    @Provides
+    fun provideBehaviorDao(database: AppDatabase): BehaviorDao {
+        return database.behaviorDao()
+    }
+
+    @Provides
+    fun provideInsightDao(database: AppDatabase): InsightDao {
+        return database.insightDao()
     }
 }

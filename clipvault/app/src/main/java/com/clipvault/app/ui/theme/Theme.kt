@@ -43,28 +43,38 @@ val ExpressiveBottomSheetShape = RoundedCornerShape(
 
 val PillShape = RoundedCornerShape(50.dp)
 
-// Standard Motion Schemes
+// [动效] 全局动效 Token 体系 — 所有动画必须引用此对象中的规范，禁止硬编码数值
 object ClipVaultMotion {
-    // 物理特性的弹性弹簧：用于 Hero 变换和容器展开
-    val ResponsiveSpring = androidx.compose.animation.core.spring<androidx.compose.ui.unit.IntOffset>(
+    // [动效] 时长 Token（毫秒）
+    const val Instant = 100       // 微反馈：ripple、选中态高亮
+    const val Quick = 200         // 轻量过渡：chip 出现、badge 闪烁、dismiss 动画
+    const val Standard = 300      // 标准页面内动画：内容展开、状态切换
+    const val Deliberate = 500    // 强调型动画：hero 进场、空状态出现、大容器展开
+
+    // [动效] 缓动 Token
+    val DefaultEasing = androidx.compose.animation.core.FastOutSlowInEasing
+    val EmphasizedEasing = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+    val LinearEasing = androidx.compose.animation.core.LinearEasing
+
+    // [动效] Spring Token（Float 类型，适用于 animateFloatAsState / Animatable）
+    val Snappy = androidx.compose.animation.core.spring<Float>(
+        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+        stiffness = androidx.compose.animation.core.Spring.StiffnessHigh
+    )
+    val Responsive = androidx.compose.animation.core.spring<Float>(
+        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+        stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+    )
+    val Bouncy = androidx.compose.animation.core.spring<Float>(
         dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
         stiffness = androidx.compose.animation.core.Spring.StiffnessLow
     )
 
-    val FloatSpring = androidx.compose.animation.core.spring<Float>(
+    // [动效] 页面转场专用 Spring（IntOffset 类型，供 NavHost 使用）
+    val PageSlide = androidx.compose.animation.core.spring<androidx.compose.ui.unit.IntOffset>(
         dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
         stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
     )
-    
-    // 快速响应弹簧：用于微动效（如按钮缩放）
-    val SnappySpring = androidx.compose.animation.core.spring<Float>(
-        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-        stiffness = androidx.compose.animation.core.Spring.StiffnessHigh
-    )
-
-    // 标准动画时长
-    val ShortDuration = 250
-    val MediumDuration = 500
 }
 
 private val DarkColorScheme = darkColorScheme(

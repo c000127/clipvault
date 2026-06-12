@@ -5,7 +5,20 @@ import android.app.Activity
 import com.clipvault.app.ui.theme.ThemeMode
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
+// [自适应] 导入行为追踪和生命周期管理
+import com.clipvault.app.data.behavior.InsightEngine
+import com.clipvault.app.data.behavior.LifecycleManager
+import com.clipvault.app.data.behavior.LifecycleStage
+import com.clipvault.app.data.local.entity.UserInsight
+// [自适应] 导入自适应布局工具
+import com.clipvault.app.ui.adaptive.rememberAdaptiveTokens
+// [动效] SharedTransition 支持
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.widthIn
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -41,6 +54,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -50,6 +64,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,10 +72,13 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun SettingsScreen(
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onBack: () -> Unit,
     onAiSettings: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
@@ -69,6 +87,7 @@ fun SettingsScreen(
     val importState by viewModel.importState.collectAsState()
     val message by viewModel.message.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     var showImportDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
@@ -162,13 +181,23 @@ fun SettingsScreen(
             )
         }
     ) { innerPadding ->
+        // [自适应] 大屏模式下限制内容最大宽度并居中
+        val tokens = rememberAdaptiveTokens()
+        Box(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .then(
+                    if (tokens.contentMaxWidth != androidx.compose.ui.unit.Dp.Unspecified)
+                        Modifier.widthIn(max = tokens.contentMaxWidth)
+                    else Modifier
+                )
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = tokens.pageHorizontal, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(tokens.sectionGap)
         ) {
             val dbInitFailed = remember { com.clipvault.app.ClipVaultApplication.dbInitFailed }
             val dbInitError = remember { com.clipvault.app.ClipVaultApplication.dbInitErrorMessage }
@@ -325,7 +354,119 @@ fun SettingsScreen(
                 }
             }
 
-            // Group 4: About Card
+            // [自适应] Group 4: My Usage Insights Card
+            var showInsights by remember { mutableStateOf(false) }
+            var stageInfo by remember { mutableStateOf<com.clipvault.app.data.behavior.StageInfo?>(null) }
+            var insights by remember { mutableStateOf<List<UserInsight>>(emptyList()) }
+            val lifecycleManager = androidx.hilt.navigation.compose.hiltViewModel<SettingsViewModel>().lifecycleManager
+            val insightEngine = androidx.hilt.navigation.compose.hiltViewModel<SettingsViewModel>().insightEngine
+
+            LaunchedEffect(Unit) {
+                stageInfo = lifecycleManager.getStageInfo()
+                insights = insightEngine.getAllInsights()
+            }
+
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = BentoAsymmetricCardShape,
+                colors = CardDefaults.elevatedCardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                ),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "My Usage Insights",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    stageInfo?.let { info ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text(
+                                    text = "Lifecycle: ${info.stage.tag}",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    text = "${info.daysSinceInstall} days since install",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (info.adaptiveEnabled) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    shape = PillShape
+                                ) {
+                                    Text(
+                                        text = "Adaptive ON",
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(onClick = { showInsights = !showInsights }) {
+                        Text(if (showInsights) "Hide Details" else "View Details")
+                    }
+                    if (showInsights && insights.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        insights.groupBy { it.insightType }.forEach { (type, items) ->
+                            Text(
+                                text = type.replace("_", " ").replaceFirstChar { it.uppercase() },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                            items.take(5).forEach { insight ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = insight.key.take(30),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        text = if (insight.value < 1) "${(insight.value * 100).toInt()}%" else "${insight.value.toInt()}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Based on ${insights.sumOf { it.sampleCount }} data points",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                insightEngine.forgetAll()
+                                insights = emptyList()
+                                snackbarHostState.showSnackbar("Habits forgotten")
+                            }
+                        }
+                    ) {
+                        Text("Forget My Habits", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            // Group 5: About Card
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = BentoAsymmetricCardShape,
@@ -364,6 +505,7 @@ fun SettingsScreen(
                 }
             }
         }
+        } // [自适应] Box wrapper for centered content on large screens
     }
 }
 

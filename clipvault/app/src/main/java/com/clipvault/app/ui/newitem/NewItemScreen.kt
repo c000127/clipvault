@@ -20,14 +20,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
+// [自适应] 导入自适应布局工具
+import com.clipvault.app.ui.adaptive.rememberAdaptiveTokens
+// [动效] SharedTransition 支持
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
  
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun NewItemScreen(
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onBack: () -> Unit,
     initialText: String? = null,
     viewModel: NewItemViewModel = hiltViewModel()
@@ -95,12 +104,22 @@ fun NewItemScreen(
             )
         }
     ) { innerPadding ->
+        // [自适应] 大屏模式下限制内容最大宽度并居中
+        val tokens = rememberAdaptiveTokens()
+        Box(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .then(
+                    if (tokens.contentMaxWidth != androidx.compose.ui.unit.Dp.Unspecified)
+                        Modifier.widthIn(max = tokens.contentMaxWidth)
+                    else Modifier
+                )
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = tokens.pageHorizontal)
         ) {
             Spacer(modifier = Modifier.height(32.dp))
             Text(
@@ -227,5 +246,6 @@ fun NewItemScreen(
             }
             Spacer(modifier = Modifier.height(32.dp))
         }
+        } // [自适应] Box wrapper for centered content on large screens
     }
 }

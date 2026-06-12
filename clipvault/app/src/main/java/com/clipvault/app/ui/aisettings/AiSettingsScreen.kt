@@ -59,10 +59,16 @@ import com.clipvault.app.data.local.entity.AiProvider
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
 import androidx.compose.material3.ElevatedCard
+// [动效] SharedTransition 支持
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun AiSettingsScreen(
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onBack: () -> Unit,
     viewModel: AiSettingsViewModel = hiltViewModel()
 ) {

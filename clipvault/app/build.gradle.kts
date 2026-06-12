@@ -87,6 +87,11 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
     implementation(libs.jsoup)
+    // [自适应] Material 3 Adaptive layout for multi-device support
+    implementation(libs.material3.adaptive)
+    implementation(libs.material3.adaptive.layout)
+    implementation(libs.material3.adaptive.navigation)
+    implementation(libs.window)
     coreLibraryDesugaring(libs.desugar.jdk.libs.nio)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

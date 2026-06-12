@@ -14,6 +14,9 @@ import com.clipvault.app.data.repository.ClipItemRepository
 import com.clipvault.app.data.repository.TagRepository
 import com.clipvault.app.ui.theme.ThemeMode
 import com.clipvault.app.ui.theme.ThemePreferences
+// [自适应] 导入行为追踪和生命周期管理
+import com.clipvault.app.data.behavior.InsightEngine
+import com.clipvault.app.data.behavior.LifecycleManager
 import com.google.gson.Gson
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -47,7 +50,10 @@ class SettingsViewModel @Inject constructor(
     private val database: AppDatabase,
     private val clipItemRepository: ClipItemRepository,
     private val tagRepository: TagRepository,
-    private val themePreferences: ThemePreferences
+    private val themePreferences: ThemePreferences,
+    // [自适应] 注入生命周期管理和洞察引擎
+    val lifecycleManager: LifecycleManager,
+    val insightEngine: InsightEngine
 ) : ViewModel() {
 
     private val gson = Gson()

@@ -3,7 +3,6 @@ package com.clipvault.app.ui.detail
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.*
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -38,10 +37,10 @@ import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
 import com.clipvault.app.ui.theme.ExpressiveBottomSheetShape
 import com.clipvault.app.ui.detail.AiState
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
 import com.clipvault.app.ui.theme.ClipVaultMotion
+// [自适应] 导入自适应布局工具
+import com.clipvault.app.ui.adaptive.rememberAdaptiveTokens
+import com.clipvault.app.ui.adaptive.rememberDeviceFormFactor
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -241,7 +240,13 @@ fun DetailScreen(
                         AnimatedContent(
                             targetState = isEditing,
                             transitionSpec = {
-                                (slideInVertically { it } + fadeIn()) togetherWith (slideOutVertically { it } + fadeOut())
+                                // [动效] 编辑模式切换：交叉淡入淡出，Standard 时长
+                                (fadeIn(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)) +
+                                    scaleIn(initialScale = 0.96f, animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)))
+                                    .togetherWith(
+                                        fadeOut(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick)) +
+                                            scaleOut(targetScale = 0.96f, animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick))
+                                    )
                             },
                             label = "ActionHub"
                         ) { editing ->
@@ -325,11 +330,21 @@ fun DetailScreen(
                     }
                 }
             ) { innerPadding ->
+                // [自适应] 大屏模式下限制内容最大宽度并居中
+                val tokens = rememberAdaptiveTokens()
+                Box(
+                    modifier = Modifier.fillMaxSize().padding(innerPadding),
+                    contentAlignment = Alignment.TopCenter
+                ) {
                 item?.let { clipItem ->
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(innerPadding)
+                            .then(
+                                if (tokens.contentMaxWidth != androidx.compose.ui.unit.Dp.Unspecified)
+                                    Modifier.widthIn(max = tokens.contentMaxWidth)
+                                else Modifier
+                            )
                             .verticalScroll(rememberScrollState())
                     ) {
                         var visible by remember { mutableStateOf(false) }
@@ -340,7 +355,10 @@ fun DetailScreen(
                         // HERO SECTION: Images & Media
                         AnimatedVisibility(
                             visible = visible,
-                            enter = slideInVertically(initialOffsetY = { 40 }) + fadeIn(),
+                            enter = slideInVertically(initialOffsetY = { 40 },
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    ClipVaultMotion.Standard, easing = ClipVaultMotion.EmphasizedEasing)) +
+                                    fadeIn(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)),
                             label = "HeroAnim"
                         ) {
                             Column {
@@ -422,8 +440,13 @@ fun DetailScreen(
                         // AI INSIGHT SECTION
                         AnimatedVisibility(
                             visible = clipItem.aiSummary.isNotBlank(),
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
+                            enter = expandVertically(
+                                animationSpec = androidx.compose.animation.core.tween(
+                                    ClipVaultMotion.Standard, easing = ClipVaultMotion.DefaultEasing)) +
+                                    fadeIn(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)),
+                            exit = shrinkVertically(
+                                animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick)) +
+                                    fadeOut(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick))
                         ) {
                             OutlinedCard(
                                 modifier = Modifier
@@ -554,6 +577,7 @@ fun DetailScreen(
                         Spacer(modifier = Modifier.height(100.dp)) // Padding for bottom bar
                     }
                 }
+                } // [自适应] Box wrapper for centered content on large screens
             }
 
             if (!isInteractionAllowed) {

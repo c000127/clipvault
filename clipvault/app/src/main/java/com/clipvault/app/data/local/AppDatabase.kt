@@ -8,25 +8,32 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.clipvault.app.data.local.dao.AiProviderDao
+import com.clipvault.app.data.local.dao.BehaviorDao
 import com.clipvault.app.data.local.dao.ClipItemDao
+import com.clipvault.app.data.local.dao.InsightDao
 import com.clipvault.app.data.local.dao.ItemTagDao
 import com.clipvault.app.data.local.dao.TagDao
 import com.clipvault.app.data.local.dao.ContentAttachmentDao
 import com.clipvault.app.data.local.entity.AiProvider
+import com.clipvault.app.data.local.entity.BehaviorLog
 import com.clipvault.app.data.local.entity.ClipItem
 import com.clipvault.app.data.local.entity.ItemTag
 import com.clipvault.app.data.local.entity.Tag
+import com.clipvault.app.data.local.entity.UserInsight
 import com.clipvault.app.data.local.entity.ContentAttachment
 
+// [自适应] 数据库升级: version 3→4，新增 behavior_logs 和 user_insights 表
 @Database(
     entities = [
         ClipItem::class,
         Tag::class,
         ItemTag::class,
         AiProvider::class,
-        ContentAttachment::class
+        ContentAttachment::class,
+        BehaviorLog::class,
+        UserInsight::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +42,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun itemTagDao(): ItemTagDao
     abstract fun aiProviderDao(): AiProviderDao
     abstract fun contentAttachmentDao(): ContentAttachmentDao
+    abstract fun behaviorDao(): BehaviorDao
+    abstract fun insightDao(): InsightDao
 
     companion object {
         @Volatile
@@ -54,6 +63,7 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                     .addMigrations(MIGRATION_1_2)
                     .addMigrations(MIGRATION_2_3)
+                    .addMigrations(MIGRATION_3_4)
                     .setQueryCallback({ sql, args ->
                         android.util.Log.d("AppDB", "SQL: $sql | Args: $args")
                     }, { it.run() })
@@ -78,6 +88,39 @@ abstract class AppDatabase : RoomDatabase() {
         private fun tableExists(db: SupportSQLiteDatabase, tableName: String): Boolean {
             val cursor = db.query("SELECT name FROM sqlite_master WHERE type='table' AND name=?", arrayOf(tableName))
             return cursor.use { it.moveToFirst() }
+        }
+
+        // [自适应] Migration 3→4: 新增 behavior_logs 和 user_insights 表
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                android.util.Log.d("AppDB", "Starting MIGRATION_3_4 (adaptive tables)...")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `behavior_logs` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `eventType` TEXT NOT NULL,
+                        `metadata` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        `sessionId` TEXT NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_behavior_logs_eventType` ON `behavior_logs` (`eventType`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_behavior_logs_timestamp` ON `behavior_logs` (`timestamp`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_behavior_logs_sessionId` ON `behavior_logs` (`sessionId`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `user_insights` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `insightType` TEXT NOT NULL,
+                        `key` TEXT NOT NULL,
+                        `value` REAL NOT NULL,
+                        `sampleCount` INTEGER NOT NULL,
+                        `lastUpdated` INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_user_insights_insightType_key` ON `user_insights` (`insightType`, `key`)")
+
+                android.util.Log.d("AppDB", "MIGRATION_3_4 completed successfully.")
+            }
         }
 
         val MIGRATION_2_3 = object : Migration(2, 3) {

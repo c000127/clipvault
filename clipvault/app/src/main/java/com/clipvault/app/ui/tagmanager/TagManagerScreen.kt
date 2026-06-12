@@ -4,6 +4,12 @@ import com.clipvault.app.data.local.entity.Tag
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
 import com.clipvault.app.ui.theme.ExpressiveBottomSheetShape
+// [自适应] 导入自适应布局工具
+import com.clipvault.app.ui.adaptive.rememberAdaptiveTokens
+// [动效] SharedTransition 支持
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,11 +26,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun TagManagerScreen(
+    sharedTransitionScope: SharedTransitionScope,
+    animatedVisibilityScope: AnimatedVisibilityScope,
     onBack: () -> Unit,
     viewModel: TagManagerViewModel = hiltViewModel()
 ) {
@@ -174,6 +183,12 @@ fun TagManagerScreen(
             }
         }
     ) { innerPadding ->
+        // [自适应] 大屏模式下限制内容最大宽度并居中
+        val tokens = rememberAdaptiveTokens()
+        Box(
+            modifier = Modifier.fillMaxSize().padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
+        ) {
         if (tagTree.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -186,8 +201,12 @@ fun TagManagerScreen(
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 20.dp),
+                    .then(
+                        if (tokens.contentMaxWidth != Dp.Unspecified)
+                            Modifier.widthIn(max = tokens.contentMaxWidth)
+                        else Modifier
+                    )
+                    .padding(horizontal = tokens.pageHorizontal),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 tagTree.forEach { node ->
@@ -202,6 +221,7 @@ fun TagManagerScreen(
                 }
             }
         }
+        } // [自适应] Box wrapper for centered content on large screens
     }
 }
 
