@@ -25,7 +25,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.clickable
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -38,9 +37,10 @@ import com.clipvault.app.ui.theme.PillShape
 import com.clipvault.app.ui.theme.ExpressiveBottomSheetShape
 import com.clipvault.app.ui.detail.AiState
 import com.clipvault.app.ui.theme.ClipVaultMotion
+import com.clipvault.app.ui.theme.ClipSharedElementKey
+import com.clipvault.app.ui.theme.ClipSharedElementType
 // [自适应] 导入自适应布局工具
 import com.clipvault.app.ui.adaptive.rememberAdaptiveTokens
-import com.clipvault.app.ui.adaptive.rememberDeviceFormFactor
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalSharedTransitionApi::class)
 @Composable
@@ -203,10 +203,19 @@ fun DetailScreen(
     with(sharedTransitionScope) {
         Box(modifier = Modifier.fillMaxSize()) {
             Scaffold(
-                modifier = Modifier.sharedElement(
-                    rememberSharedContentState(key = "item_${viewModel.itemId}"),
-                    animatedVisibilityScope = animatedVisibilityScope
-                ),
+                modifier = Modifier
+                    .sharedBounds(
+                        sharedContentState = rememberSharedContentState(key = ClipSharedElementKey(viewModel.itemId, ClipSharedElementType.Bounds)),
+                        animatedVisibilityScope = animatedVisibilityScope,
+                        boundsTransform = { _, _ -> ClipVaultMotion.SpatialExpressiveSpring },
+                        clipInOverlayDuringTransition = OverlayClip(BentoAsymmetricCardShape),
+                        enter = fadeIn(ClipVaultMotion.NonSpatialExpressiveSpring),
+                        exit = fadeOut(ClipVaultMotion.NonSpatialExpressiveSpring)
+                    )
+                    .sharedElement(
+                        rememberSharedContentState(key = ClipSharedElementKey(viewModel.itemId, ClipSharedElementType.Content)),
+                        animatedVisibilityScope = animatedVisibilityScope
+                    ),
                 containerColor = MaterialTheme.colorScheme.surface,
                 topBar = {
                     TopAppBar(

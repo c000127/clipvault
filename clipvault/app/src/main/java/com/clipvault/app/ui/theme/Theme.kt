@@ -91,10 +91,20 @@ object ClipVaultMotion {
         dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
         stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
     )
-    // [动效] 容器变换专用 Spring（Bounds transform）
+    // [动效] 容器变换专用 Spring（Bounds transform，参考 Jetsnack spatialExpressiveSpring）
     val BoundsTransform = androidx.compose.animation.core.spring<Rect>(
-        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
-        stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+        dampingRatio = 0.8f,
+        stiffness = 380f
+    )
+    // [动效] 空间弹簧（bounds transform, position changes — 参考 Jetsnack）
+    val SpatialExpressiveSpring = androidx.compose.animation.core.spring<Rect>(
+        dampingRatio = 0.8f,
+        stiffness = 380f
+    )
+    // [动效] 非空间弹簧（fadeIn/Out, opacity — 参考 Jetsnack nonSpatialExpressiveSpring）
+    val NonSpatialExpressiveSpring = androidx.compose.animation.core.spring<Float>(
+        dampingRatio = 1f,
+        stiffness = 1600f
     )
 }
 

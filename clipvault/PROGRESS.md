@@ -322,3 +322,51 @@
 - **消除**: 所有 `tween()` 转场（shimmer 除外）
 - **新增**: 6 个动效 Token（DecelerateEasing, AccelerateEasing, ScaleIn, GentleExpand, ExpandSpring, BoundsTransform）
 - **模式**: 6 种 M3 原生动效（纯 spring slide, expand/shrink, scaleIn, sharedElement, PageSlide spring, BoundsTransform）
+
+## M3 Container Transform 重构（第二轮）✅
+
+### Phase 1: Token 层修正
+- [x] 新增 `SpatialExpressiveSpring`（dampingRatio=0.8f, stiffness=380f，参考 Jetsnack）
+- [x] 新增 `NonSpatialExpressiveSpring`（dampingRatio=1f, stiffness=1600f，参考 Jetsnack）
+- [x] 更新 `BoundsTransform` 参数与 SpatialExpressiveSpring 一致
+- [x] 确认 `EmphasizedEasing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)` 正确
+- [x] Build verification passed
+
+### Phase 2: Shared Element Key 重构
+- [x] 新建 `ClipSharedElementKey.kt`：`ClipSharedElementKey(clipId, type)` + `ClipSharedElementType` enum
+- [x] `ClipSharedElementType`: `Bounds`, `Title`, `Content`
+- [x] HomeScreen.kt: 字符串 key `"item_${item.id}"` → `ClipSharedElementKey(item.id, ClipSharedElementType.Content)`
+- [x] DetailScreen.kt: 字符串 key `"item_${viewModel.itemId}"` → `ClipSharedElementKey(viewModel.itemId, ClipSharedElementType.Content)`
+- [x] Build verification passed
+
+### Phase 3: Container Transform 接入
+- [x] **MainActivity.kt**: Home/Detail/New 页面转场从 `slideInHorizontally` → `fadeIn/fadeOut(NonSpatialExpressiveSpring)`（Jetsnack 模式）
+- [x] **HomeScreen.kt**: ClipCard 从 `sharedElement` → `sharedBounds(Bounds)` + `sharedElement(Content)` 双层架构
+- [x] **HomeScreen.kt**: `sharedBounds` 使用 `boundsTransform = SpatialExpressiveSpring` + `OverlayClip(BentoAsymmetricCardShape)`
+- [x] **DetailScreen.kt**: Scaffold 从 `sharedElement` → `sharedBounds(Bounds)` + `sharedElement(Content)` 双层架构
+- [x] **DetailScreen.kt**: `sharedBounds` 使用 `boundsTransform = SpatialExpressiveSpring` + `OverlayClip(BentoAsymmetricCardShape)`
+- [x] Build verification passed
+
+### Phase 4: Materialize 动画
+- [x] HomeScreen 批量操作栏：`slideInVertically` → `scaleIn(0.8f, ScaleIn)` + `fadeIn(NonSpatialExpressiveSpring)`
+- [x] scaleIn 为主视觉效果，fadeIn 为辅
+- [x] Build verification passed
+
+### Phase 5: 折叠区域确认
+- [x] DetailScreen AI 结果：`expandVertically` + `shrinkVertically` 使用 `ExpandSpring` ✅
+- [x] HomeScreen 剪贴板建议：`expandVertically` + `shrinkVertically` 使用 `ExpandSpring` ✅
+
+### Phase 6-7: 审查与修复
+- [x] 移除 3 个未使用导入（HomeScreen: detectTapGestures, pointerInput; DetailScreen: clickable）
+- [x] 移除 1 个重复导入（DetailScreen: BentoAsymmetricCardShape）
+- [x] 移除 1 个未使用导入（DetailScreen: rememberDeviceFormFactor）
+- [x] 验证所有 sharedBounds/sharedElement key 使用 data class（0 残留字符串 key）
+- [x] 验证所有 spring 参数引用 ClipVaultMotion Token（0 硬编码）
+
+### Container Transform 架构总结
+- **文件新增**: 1 (`ClipSharedElementKey.kt`)
+- **文件修改**: 4 (Theme.kt, MainActivity.kt, HomeScreen.kt, DetailScreen.kt)
+- **API 模式**: `sharedBounds()` (Container Transform) + `sharedElement()` (Hero Transition) 双层架构
+- **Key 类型**: `ClipSharedElementKey(clipId: Long, type: ClipSharedElementType)` data class
+- **Spring 参数**: `SpatialExpressiveSpring(0.8f, 380f)` for bounds, `NonSpatialExpressiveSpring(1f, 1600f)` for fade
+- **参考**: Jetsnack `SnackSharedElementKey` + `spatialExpressiveSpring()` + `nonSpatialExpressiveSpring()`

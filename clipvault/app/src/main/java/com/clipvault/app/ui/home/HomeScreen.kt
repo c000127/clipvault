@@ -3,9 +3,7 @@ package com.clipvault.app.ui.home
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.input.pointer.pointerInput
 import com.clipvault.app.ui.theme.BentoAsymmetricCardShape
 import com.clipvault.app.ui.theme.PillShape
 // [自适应] 导入自适应布局工具
@@ -38,6 +36,8 @@ import androidx.compose.animation.*
 import androidx.compose.ui.graphics.Color
 // [动效] 引用全局动效 Token
 import com.clipvault.app.ui.theme.ClipVaultMotion
+import com.clipvault.app.ui.theme.ClipSharedElementKey
+import com.clipvault.app.ui.theme.ClipSharedElementType
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -129,16 +129,18 @@ fun HomeScreen(
         bottomBar = {
             Column {
                 // Batch Actions Bar
-                // [动效] 批量操作栏：纯 spring 滑动，不加 fade
+                // [动效] Materialize: 从材质中浮现，scaleIn 为主，fadeIn 为辅
                 AnimatedVisibility(
                     visible = selectedItemIds.isNotEmpty(),
-                    enter = slideInVertically(
-                        initialOffsetY = { it },
-                        animationSpec = ClipVaultMotion.PageSlide
+                    enter = scaleIn(
+                        initialScale = 0.8f,
+                        animationSpec = ClipVaultMotion.ScaleIn
+                    ) + fadeIn(
+                        animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring
                     ),
-                    exit = slideOutVertically(
-                        targetOffsetY = { it },
-                        animationSpec = ClipVaultMotion.PageSlide
+                    exit = scaleOut(
+                        targetScale = 0.8f,
+                        animationSpec = ClipVaultMotion.ScaleIn
                     )
                 ) {
                     BottomAppBar(
@@ -434,8 +436,16 @@ private fun LazyStaggeredGridItemScope.ClipCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .animateItem()
+                .sharedBounds(
+                    sharedContentState = rememberSharedContentState(key = ClipSharedElementKey(item.id, ClipSharedElementType.Bounds)),
+                    animatedVisibilityScope = animatedVisibilityScope,
+                    boundsTransform = { _, _ -> ClipVaultMotion.SpatialExpressiveSpring },
+                    clipInOverlayDuringTransition = OverlayClip(BentoAsymmetricCardShape),
+                    enter = fadeIn(ClipVaultMotion.NonSpatialExpressiveSpring),
+                    exit = fadeOut(ClipVaultMotion.NonSpatialExpressiveSpring)
+                )
                 .sharedElement(
-                    rememberSharedContentState(key = "item_${item.id}"),
+                    rememberSharedContentState(key = ClipSharedElementKey(item.id, ClipSharedElementType.Content)),
                     animatedVisibilityScope = animatedVisibilityScope
                 )
                 .combinedClickable(onClick = onClick, onLongClick = onLongClick),

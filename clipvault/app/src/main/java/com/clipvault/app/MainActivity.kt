@@ -31,6 +31,8 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import com.clipvault.app.ui.theme.ClipVaultMotion
 
 @AndroidEntryPoint
@@ -80,28 +82,16 @@ class MainActivity : ComponentActivity() {
                     ) {
                         composable<Screen.Home>(
                             enterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { it / 3 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeIn(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             },
                             exitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { -it / 3 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeOut(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             },
                             popEnterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { -it / 3 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeIn(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             },
                             popExitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { it / 3 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeOut(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             }
                         ) {
                             HomeScreen(
@@ -132,28 +122,16 @@ class MainActivity : ComponentActivity() {
 
                         composable<Screen.Detail>(
                             enterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { it / 2 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeIn(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             },
                             exitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { -it / 3 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeOut(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             },
                             popEnterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { -it / 3 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeIn(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             },
                             popExitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { it / 2 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeOut(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             }
                         ) {
                             DetailScreen(
@@ -165,28 +143,16 @@ class MainActivity : ComponentActivity() {
 
                         composable<Screen.New>(
                             enterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { it / 2 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeIn(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             },
                             exitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { -it / 3 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeOut(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             },
                             popEnterTransition = {
-                                slideInHorizontally(
-                                    initialOffsetX = { -it / 3 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeIn(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             },
                             popExitTransition = {
-                                slideOutHorizontally(
-                                    targetOffsetX = { it / 2 },
-                                    animationSpec = ClipVaultMotion.PageSlide
-                                )
+                                fadeOut(animationSpec = ClipVaultMotion.NonSpatialExpressiveSpring)
                             }
                         ) { backStackEntry ->
                             val route = backStackEntry.toRoute<Screen.New>()
