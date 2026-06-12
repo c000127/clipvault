@@ -129,16 +129,17 @@ fun HomeScreen(
         bottomBar = {
             Column {
                 // Batch Actions Bar
+                // [动效] 批量操作栏：纯 spring 滑动，不加 fade
                 AnimatedVisibility(
                     visible = selectedItemIds.isNotEmpty(),
                     enter = slideInVertically(
                         initialOffsetY = { it },
-                        animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard, easing = ClipVaultMotion.DefaultEasing)
-                    ) + fadeIn(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)),
+                        animationSpec = ClipVaultMotion.PageSlide
+                    ),
                     exit = slideOutVertically(
                         targetOffsetY = { it },
-                        animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick, easing = ClipVaultMotion.DefaultEasing)
-                    ) + fadeOut(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick, easing = ClipVaultMotion.DefaultEasing))
+                        animationSpec = ClipVaultMotion.PageSlide
+                    )
                 ) {
                     BottomAppBar(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -311,14 +312,15 @@ private fun SelectedTagsRow(allTags: List<Tag>, selectedTagIds: Set<Long>, viewM
 
 @Composable
 private fun ClipboardSuggestionCard(text: String?, viewModel: HomeViewModel) {
+    // [动效] 剪贴板建议：纯 expand/shrink 容器动画，不加 fade
     AnimatedVisibility(
         visible = text != null,
         enter = expandVertically(
-            animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard, easing = ClipVaultMotion.DefaultEasing)
-        ) + fadeIn(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)),
+            animationSpec = ClipVaultMotion.ExpandSpring
+        ),
         exit = shrinkVertically(
-            animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick, easing = ClipVaultMotion.DefaultEasing)
-        ) + fadeOut(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick, easing = ClipVaultMotion.DefaultEasing)),
+            animationSpec = ClipVaultMotion.ExpandSpring
+        ),
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         text?.let { content ->

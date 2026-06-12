@@ -14,11 +14,10 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Modifier
@@ -54,6 +53,8 @@ object ClipVaultMotion {
     // [动效] 缓动 Token
     val DefaultEasing = androidx.compose.animation.core.FastOutSlowInEasing
     val EmphasizedEasing = androidx.compose.animation.core.CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+    val DecelerateEasing = androidx.compose.animation.core.CubicBezierEasing(0.0f, 0.0f, 0.0f, 1.0f)
+    val AccelerateEasing = androidx.compose.animation.core.CubicBezierEasing(0.3f, 0.0f, 1.0f, 1.0f)
     val LinearEasing = androidx.compose.animation.core.LinearEasing
 
     // [动效] Spring Token（Float 类型，适用于 animateFloatAsState / Animatable）
@@ -69,9 +70,29 @@ object ClipVaultMotion {
         dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
         stiffness = androidx.compose.animation.core.Spring.StiffnessLow
     )
+    // [动效] scaleIn/Out 弹簧（轻弹）
+    val ScaleIn = androidx.compose.animation.core.spring<Float>(
+        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioLowBouncy,
+        stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+    )
+    // [动效] expand/shrink 容器弹簧
+    val GentleExpand = androidx.compose.animation.core.spring<Float>(
+        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+        stiffness = androidx.compose.animation.core.Spring.StiffnessMediumLow
+    )
 
     // [动效] 页面转场专用 Spring（IntOffset 类型，供 NavHost 使用）
     val PageSlide = androidx.compose.animation.core.spring<androidx.compose.ui.unit.IntOffset>(
+        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+        stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+    )
+    // [动效] expand/shrink 容器弹簧（IntSize 类型，供 expandVertically/shrinkVertically 使用）
+    val ExpandSpring = androidx.compose.animation.core.spring<androidx.compose.ui.unit.IntSize>(
+        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
+        stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
+    )
+    // [动效] 容器变换专用 Spring（Bounds transform）
+    val BoundsTransform = androidx.compose.animation.core.spring<Rect>(
         dampingRatio = androidx.compose.animation.core.Spring.DampingRatioNoBouncy,
         stiffness = androidx.compose.animation.core.Spring.StiffnessMedium
     )

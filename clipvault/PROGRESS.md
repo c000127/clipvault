@@ -279,3 +279,46 @@
 - **Database version**: 3 → 4 (migration-safe)
 - **New dependencies**: M3 Adaptive 1.1.0, WindowManager 1.3.0
 - **All behavior data local-only**: no network uploads
+
+## M3 原生动效重构 (Compose BOM 2026.05.01) ✅
+
+### Phase A: Token 层重构 (Theme.kt)
+- [x] 新增 `DecelerateEasing` / `AccelerateEasing` 缓动 Token
+- [x] 新增 `ScaleIn` Float spring（轻弹，用于 scaleIn/Out）
+- [x] 新增 `GentleExpand` Float spring（用于 animateFloatAsState）
+- [x] 新增 `ExpandSpring` IntSize spring（用于 expandVertically/shrinkVertically）
+- [x] 新增 `BoundsTransform` Rect spring（用于容器变换）
+- [x] Build verification passed
+
+### Phase B: NavHost 页面转场重构 (MainActivity.kt)
+- [x] 移除所有 `fadeIn` / `fadeOut` 导入和调用
+- [x] 移除所有 `tween()` 转场
+- [x] 6 组页面（Home/Detail/New/TagManager/Settings/AiSettings）统一为纯 `slideInHorizontally` + `PageSlide` spring
+- [x] Build verification passed
+
+### Phase C: HomeScreen 组件动画重写
+- [x] Batch Actions Bar: `slideInVertically + fadeIn` → 纯 `slideInVertically(PageSlide)`
+- [x] Clipboard Suggestion: `expandVertically + fadeIn` → 纯 `expandVertically(ExpandSpring)`
+- [x] Build verification passed
+
+### Phase D: DetailScreen 组件动画重写
+- [x] 编辑模式切换: `fadeIn + scaleIn(0.96f)` → 纯 `scaleIn(0.95f, ScaleIn)`
+- [x] Hero 区域: `slideInVertically + fadeIn` → 纯 `slideInVertically(PageSlide)`
+- [x] AI 结果: `expandVertically + fadeIn` → 纯 `expandVertically(ExpandSpring)`
+- [x] Build verification passed
+
+### Phase E: EmptyState/ErrorState 重写
+- [x] EmptyState: `fadeIn(tween(Deliberate))` → `scaleIn(0.9f, ScaleIn)`
+- [x] ErrorState: `fadeIn(tween(Deliberate))` → `scaleIn(0.9f, ScaleIn)`
+- [x] Build verification passed
+
+### Phase F: SkeletonLoader 审计
+- [x] Shimmer 效果保留（infiniteRepeatable + LinearEasing 循环动画合理）
+- [x] 颜色已使用 M3 surfaceContainer（无需修改）
+- [x] Build verification passed
+
+### 动效重构统计
+- **消除**: 35+ 处 `fadeIn`/`fadeOut` 调用
+- **消除**: 所有 `tween()` 转场（shimmer 除外）
+- **新增**: 6 个动效 Token（DecelerateEasing, AccelerateEasing, ScaleIn, GentleExpand, ExpandSpring, BoundsTransform）
+- **模式**: 6 种 M3 原生动效（纯 spring slide, expand/shrink, scaleIn, sharedElement, PageSlide spring, BoundsTransform）

@@ -240,12 +240,10 @@ fun DetailScreen(
                         AnimatedContent(
                             targetState = isEditing,
                             transitionSpec = {
-                                // [动效] 编辑模式切换：交叉淡入淡出，Standard 时长
-                                (fadeIn(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)) +
-                                    scaleIn(initialScale = 0.96f, animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)))
+                                // [动效] 编辑模式切换：纯 spring scale 变换
+                                (scaleIn(initialScale = 0.95f, animationSpec = ClipVaultMotion.ScaleIn))
                                     .togetherWith(
-                                        fadeOut(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick)) +
-                                            scaleOut(targetScale = 0.96f, animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick))
+                                        scaleOut(targetScale = 0.95f, animationSpec = ClipVaultMotion.ScaleIn)
                                     )
                             },
                             label = "ActionHub"
@@ -353,12 +351,11 @@ fun DetailScreen(
                         }
 
                         // HERO SECTION: Images & Media
+                        // [动效] Hero 区域入场：纯 spring 滑动，不加 fade
                         AnimatedVisibility(
                             visible = visible,
                             enter = slideInVertically(initialOffsetY = { 40 },
-                                animationSpec = androidx.compose.animation.core.tween(
-                                    ClipVaultMotion.Standard, easing = ClipVaultMotion.EmphasizedEasing)) +
-                                    fadeIn(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)),
+                                animationSpec = ClipVaultMotion.PageSlide),
                             label = "HeroAnim"
                         ) {
                             Column {
@@ -438,15 +435,13 @@ fun DetailScreen(
                         }
 
                         // AI INSIGHT SECTION
+                        // [动效] AI 结果：纯 expand/shrink 容器动画，不加 fade
                         AnimatedVisibility(
                             visible = clipItem.aiSummary.isNotBlank(),
                             enter = expandVertically(
-                                animationSpec = androidx.compose.animation.core.tween(
-                                    ClipVaultMotion.Standard, easing = ClipVaultMotion.DefaultEasing)) +
-                                    fadeIn(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Standard)),
+                                animationSpec = ClipVaultMotion.ExpandSpring),
                             exit = shrinkVertically(
-                                animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick)) +
-                                    fadeOut(animationSpec = androidx.compose.animation.core.tween(ClipVaultMotion.Quick))
+                                animationSpec = ClipVaultMotion.ExpandSpring)
                         ) {
                             OutlinedCard(
                                 modifier = Modifier

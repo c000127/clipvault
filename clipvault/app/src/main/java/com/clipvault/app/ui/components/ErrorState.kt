@@ -1,8 +1,7 @@
 package com.clipvault.app.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -28,7 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.clipvault.app.ui.theme.ClipVaultMotion
 
-// [动效] 错误状态入场动画：fadeIn，Deliberate 时长
+// [动效] 错误状态入场：spring 弹性缩放
 @Composable
 fun ErrorState(
     message: String,
@@ -40,7 +39,10 @@ fun ErrorState(
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(animationSpec = tween(ClipVaultMotion.Deliberate))
+        enter = scaleIn(
+            initialScale = 0.9f,
+            animationSpec = ClipVaultMotion.ScaleIn
+        )
     ) {
         Column(
             modifier = modifier
